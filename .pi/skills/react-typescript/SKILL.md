@@ -1,3 +1,8 @@
+---
+name: react-typescript
+description: React + TypeScript 项目编码规范。技术栈选择、深模块设计、测试哲学。适用于所有 React/TS 项目。
+---
+
 # React + TypeScript 规范
 
 > 仅记录技术栈选择和非显而易见的设计决策。基础 TS/React 最佳实践不再重复。

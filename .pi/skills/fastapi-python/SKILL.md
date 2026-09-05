@@ -1,3 +1,8 @@
+---
+name: fastapi-python
+description: FastAPI + Python 项目编码规范。分层架构、领域异常、Pydantic v2 模式。适用于所有 FastAPI 项目。
+---
+
 # FastAPI + Python 规范
 
 > 仅记录架构决策和项目特有模式。PEP 8、基础类型注解、标准命名等不再重复。

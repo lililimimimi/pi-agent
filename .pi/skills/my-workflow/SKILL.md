@@ -1,3 +1,8 @@
+---
+name: my-workflow
+description: 开发工作流规范。Git 分支策略、TDD 流程、双轴 Code Review。适用于所有项目。
+---
+
 # 工作流规范
 
 > Conventional Commits、TDD、Semver 等基础概念不再展开。只记录具体决策。
