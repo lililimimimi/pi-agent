@@ -1,35 +1,24 @@
-# 模块 1：规范文件
+# 模块 1：规范文件 ✅
 
-**目标：** 创建全局代码规范，供 Agent 注入 system prompt。
+**目标：** 创建全局代码规范（pi skills 格式），供 Agent 注入 system prompt。
 
 ## 文件
-- `~/.code-assistant/rules/react-typescript.md`
-- `~/.code-assistant/rules/fastapi-python.md`
-- `~/.code-assistant/rules/my-workflow.md`
-- `docs/rules/`（备份，纳入 git）
+- `~/.pi/agent/skills/react-typescript/SKILL.md`（全局）
+- `~/.pi/agent/skills/fastapi-python/SKILL.md`（全局）
+- `~/.pi/agent/skills/my-workflow/SKILL.md`（全局）
+- `.pi/skills/`（项目级，纳入 git）
 
 ## 步骤
 
-- [ ] 创建目录
-```bash
-mkdir -p ~/.code-assistant/rules
-mkdir -p docs/rules
-```
+- [x] 创建 `react-typescript` skill (71 行)
+内容要点：技术栈选择、深模块设计、seam 纪律、discriminated union、测试哲学
 
-- [ ] 创建 `react-typescript.md`
-内容要点：函数组件、strict TS、Tailwind+shadcn/ui、Zustand、命名规范
+- [x] 创建 `fastapi-python` skill (101 行)
+内容要点：分层架构、领域异常体系、Pydantic v2 模式、Annotated 依赖、RORO
 
-- [ ] 创建 `fastapi-python.py`
-内容要点：Pydantic v2、async、分层架构、ToolResult 不抛异常
+- [x] 创建 `my-workflow` skill (40 行)
+内容要点：双轴 code review、TDD 垂直切片、seam 测试、commit 纪律
 
-- [ ] 创建 `my-workflow.md`
-内容要点：Conventional Commits、TDD、YAGNI、先写测试再 commit
-
-- [ ] 备份到 `docs/rules/` 并提交
-```bash
-cp ~/.code-assistant/rules/*.md docs/rules/
-git add docs/rules/
-git commit -m "docs: add global code rules"
-```
+- [x] 全局 + 项目级双份部署，提交到 `feat/module-1-rules` 分支
 
 ## ⏸ 审核后继续模块 2
