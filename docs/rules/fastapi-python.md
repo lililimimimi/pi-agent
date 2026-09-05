@@ -1,138 +1,744 @@
-# FastAPI + Python 代码规范
+# FastAPI + Python Coding Standards
 
-## 基本原则
+> Injected as system-prompt rules for AI coding agents working on FastAPI projects.
 
-- Python 3.11+，使用类型注解
-- 异步优先：所有 I/O 操作使用 `async/await`
-- 使用 **Pydantic v2** 进行数据验证
+---
 
-## 分层架构
+## 1. Prime Directive
+
+**Correctness > Consistency within module > Consistency within project > This guide.**
+
+When rules conflict with correctness, correctness wins. When existing module style differs from this guide but is internally consistent, match the module. Never cargo-cult a pattern that makes the code worse.
+
+---
+
+## 2. Toolchain
+
+| Tool | Purpose | Config |
+|------|---------|--------|
+| **Ruff** | Linter + formatter | `line-length = 88`, `target-version = "py312"` |
+| **mypy** | Type checker | `strict = true` |
+| **pytest** | Test runner | `asyncio_mode = "auto"` via pytest-asyncio |
+| **pre-commit** | Git hooks | Runs ruff, mypy, tests on commit |
+
+- 4 spaces, no tabs. No trailing whitespace.
+- Ruff replaces Black, isort, flake8, and pyupgrade. Do not add those separately.
+- All CI must pass `ruff check .`, `ruff format --check .`, and `mypy .` with zero errors.
+
+---
+
+## 3. Architecture — Layered Separation
 
 ```
-app/
-  api/            # 路由层（thin，只做参数解析和响应）
-    routes/
-  core/           # 配置、安全、依赖注入
-  models/         # SQLAlchemy / 数据库模型
-  schemas/        # Pydantic schemas（请求/响应）
-  services/       # 业务逻辑层
-  repositories/   # 数据访问层
+Routes (API layer)  →  Services (business logic)  →  Repositories (data access)  →  Models (SQLAlchemy / domain)
 ```
 
-### 职责划分
-
-- **Routes（路由）**：参数解析、调用 service、返回响应，不含业务逻辑
-- **Services（服务）**：业务逻辑、编排多个 repository
-- **Repositories（仓库）**：数据库操作、查询构建
-
-## Pydantic v2
-
-- 使用 `model_validator`、`field_validator` 替代 v1 的 `validator`
-- Schema 按用途拆分：`UserCreate`, `UserUpdate`, `UserResponse`
-- 使用 `ConfigDict` 替代 `class Config`
+**Rules:**
+- **Routes** receive HTTP requests, validate via Pydantic, call services, return Pydantic responses. No business logic. No direct DB access.
+- **Services** orchestrate business logic. Raise domain exceptions, never `HTTPException`. Services are unaware of HTTP.
+- **Repositories** encapsulate all database queries. Return domain models or dataclasses, never raw rows.
+- **Models** define SQLAlchemy ORM models and domain entities. No import of FastAPI or Pydantic here.
 
 ```python
-from pydantic import BaseModel, ConfigDict, field_validator
+# ✅ Correct: route delegates to service
+@router.post("/users", status_code=201, response_model=UserOut)
+async def create_user(body: UserCreate, svc: UserServiceDep) -> UserOut:
+    user = await svc.create(body)
+    return UserOut.model_validate(user)
 
-class UserCreate(BaseModel):
-    model_config = ConfigDict(strict=True)
-
-    username: str
-    email: str
-
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, v: str) -> str:
-        if "@" not in v:
-            raise ValueError("Invalid email")
-        return v.lower()
-```
-
-## 错误处理 — ToolResult 模式
-
-- **不抛异常传递业务错误**，使用 `ToolResult` 返回结构化结果
-- 异常仅用于不可恢复错误（数据库连接失败等）
-
-```python
-from dataclasses import dataclass
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-@dataclass
-class ToolResult(Generic[T]):
-    success: bool
-    data: T | None = None
-    error: str | None = None
-
-    @classmethod
-    def ok(cls, data: T) -> "ToolResult[T]":
-        return cls(success=True, data=data)
-
-    @classmethod
-    def fail(cls, error: str) -> "ToolResult[T]":
-        return cls(success=False, error=error)
-```
-
-```python
-# service 层
-async def create_user(self, payload: UserCreate) -> ToolResult[User]:
-    existing = await self.repo.get_by_email(payload.email)
-    if existing:
-        return ToolResult.fail("Email already registered")
-    user = await self.repo.create(payload)
-    return ToolResult.ok(user)
-
-# route 层
+# ❌ Wrong: business logic in route
 @router.post("/users")
-async def create_user(payload: UserCreate, service: UserService = Depends()):
-    result = await service.create_user(payload)
-    if not result.success:
-        raise HTTPException(status_code=400, detail=result.error)
-    return result.data
+async def create_user(body: UserCreate, db: DbSession) -> dict:
+    if await db.execute(select(User).where(User.email == body.email)):
+        raise HTTPException(409, "exists")
+    user = User(**body.model_dump())
+    db.add(user)
+    await db.commit()
+    return {"id": user.id}
 ```
 
-## 异步
+---
 
-- 数据库使用 `asyncpg` / `SQLAlchemy async`
-- HTTP 客户端使用 `httpx.AsyncClient`
-- 文件 I/O 使用 `aiofiles`
-- 禁止在 async 函数中调用同步阻塞操作
+## 4. FastAPI Patterns
 
-## 依赖注入
-
-- 使用 FastAPI 的 `Depends()` 进行依赖注入
-- 数据库 session 通过依赖注入传递
-- 配置通过 `pydantic-settings` 管理
+### App Factory
 
 ```python
-from functools import lru_cache
-from pydantic_settings import BaseSettings
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+
+from fastapi import FastAPI
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Startup: init DB pool, caches, etc.
+    async with db_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    # Shutdown: dispose connections
+    await db_engine.dispose()
+
+def create_app() -> FastAPI:
+    app = FastAPI(title="MyService", lifespan=lifespan)
+    app.include_router(users.router, prefix="/api/v1")
+    app.add_exception_handler(AppError, app_error_handler)
+    return app
+```
+
+Never use deprecated `@app.on_event("startup")` / `@app.on_event("shutdown")`. Use the lifespan context manager.
+
+### Annotated Dependencies
+
+```python
+from typing import Annotated
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+async def get_db() -> AsyncIterator[AsyncSession]:
+    async with async_session_maker() as session:
+        yield session
+
+DbSession = Annotated[AsyncSession, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
+UserServiceDep = Annotated[UserService, Depends(get_user_service)]
+```
+
+Define `Annotated` aliases in a `deps.py` module. Use them in route signatures — never inline `Depends()` calls in function params.
+
+### RORO — Receive Object, Return Object
+
+Every route receives a Pydantic model (or path/query params) and returns a Pydantic model. Never return raw `dict`. Never accept raw `dict`.
+
+```python
+# ✅
+@router.get("/users/{user_id}", response_model=UserOut)
+async def get_user(user_id: UUID, svc: UserServiceDep) -> UserOut: ...
+
+# ❌
+@router.get("/users/{user_id}")
+async def get_user(user_id: str, db: DbSession) -> dict: ...
+```
+
+### Settings
+
+```python
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="APP_")
+
     database_url: str
     secret_key: str
-
-    model_config = ConfigDict(env_file=".env")
+    debug: bool = False
+    allowed_origins: list[str] = ["http://localhost:3000"]
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
 ```
 
-## 命名规范
+---
 
-| 类型 | 规范 | 示例 |
-|------|------|------|
-| 函数/变量 | snake_case | `get_user_by_id` |
-| 类 | PascalCase | `UserService` |
-| 常量 | UPPER_SNAKE_CASE | `MAX_CONNECTIONS` |
-| 文件/模块 | snake_case | `user_service.py` |
-| 路由路径 | kebab-case | `/api/user-profiles` |
+## 5. Pydantic v2
 
-## 测试
+### ConfigDict, Not Inner `class Config`
 
-- 使用 **pytest** + **pytest-asyncio**
-- 测试文件：`test_user_service.py`
-- 使用 `httpx.AsyncClient` 进行 API 集成测试
-- Mock 外部依赖，不 mock 被测对象内部实现
+```python
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True, strict=True)
+
+    id: UUID
+    email: str
+    created_at: datetime
+```
+
+### Schema Splits
+
+Separate schemas by purpose. Never reuse a creation schema as a response schema.
+
+```python
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str  # never in response
+
+class UserUpdate(BaseModel):
+    email: EmailStr | None = None
+    display_name: str | None = None
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    email: str
+    display_name: str | None
+    created_at: datetime
+```
+
+### Validators
+
+```python
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if len(v) < 10:
+            msg = "Password must be at least 10 characters"
+            raise ValueError(msg)
+        return v
+
+    @model_validator(mode="after")
+    def check_consistency(self) -> Self:
+        # cross-field validation here
+        return self
+```
+
+---
+
+## 6. Error Handling
+
+### Domain Exception Hierarchy
+
+```python
+class AppError(Exception):
+    """Base for all domain exceptions."""
+
+    def __init__(
+        self,
+        message: str,
+        code: str = "APP_ERROR",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        self.message = message
+        self.code = code
+        self.details = details or {}
+        super().__init__(message)
+
+class NotFoundError(AppError):
+    def __init__(self, resource: str, id: str | UUID) -> None:
+        super().__init__(f"{resource} {id} not found", code="NOT_FOUND", details={"resource": resource, "id": str(id)})
+
+class ValidationError(AppError):
+    def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
+        super().__init__(message, code="VALIDATION_ERROR", details=details)
+
+class AuthenticationError(AppError):
+    def __init__(self, message: str = "Invalid credentials") -> None:
+        super().__init__(message, code="AUTHENTICATION_ERROR")
+
+class AuthorizationError(AppError):
+    def __init__(self, message: str = "Insufficient permissions") -> None:
+        super().__init__(message, code="AUTHORIZATION_ERROR")
+
+class ConflictError(AppError):
+    def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
+        super().__init__(message, code="CONFLICT", details=details)
+```
+
+### Global Exception Handler — ONE Place
+
+```python
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+_STATUS_MAP: dict[type[AppError], int] = {
+    NotFoundError: 404,
+    ValidationError: 422,
+    AuthenticationError: 401,
+    AuthorizationError: 403,
+    ConflictError: 409,
+}
+
+async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+    status = _STATUS_MAP.get(type(exc), 500)
+    return JSONResponse(
+        status_code=status,
+        content={"error": {"code": exc.code, "message": exc.message, "details": exc.details}},
+    )
+```
+
+Register via `app.add_exception_handler(AppError, app_error_handler)` in the app factory. Services never import `HTTPException`.
+
+### Exception Chaining — Always
+
+```python
+# ✅
+try:
+    result = await db.execute(query)
+except IntegrityError as exc:
+    raise ConflictError("Email already registered") from exc
+
+# ❌ Swallows traceback
+except IntegrityError:
+    raise ConflictError("Email already registered")
+```
+
+---
+
+## 7. Type Annotations
+
+```python
+from __future__ import annotations  # top of EVERY file
+```
+
+- Annotate **all** function signatures: parameters and return types.
+- Annotate **all** class attributes and module-level variables.
+- Use `X | None` not `Optional[X]`. Use `list[int]` not `List[int]`.
+- `Any` requires a `# noqa` comment explaining why. Prefer `object` for truly unknown.
+- Use `TypeVar` / `ParamSpec` / `Protocol` for generic patterns.
+- Collections: use `collections.abc` types (`Sequence`, `Mapping`, `Iterable`) for inputs; concrete types (`list`, `dict`) only for outputs.
+
+```python
+from collections.abc import Sequence
+
+# ✅ Accept broad, return narrow
+async def get_users(ids: Sequence[UUID]) -> list[UserOut]: ...
+
+# ❌ Too restrictive for input
+async def get_users(ids: list[UUID]) -> list[UserOut]: ...
+```
+
+---
+
+## 8. Naming Conventions
+
+| Element | Convention | Example |
+|---------|-----------|---------|
+| Functions / methods | `snake_case` | `get_user_by_email` |
+| Variables | `snake_case` | `user_count` |
+| Classes | `PascalCase` | `UserService` |
+| Constants | `UPPER_SNAKE_CASE` | `MAX_RETRY_COUNT` |
+| Modules / packages | `snake_case` | `user_service.py` |
+| Enum members | `UPPER_SNAKE_CASE` | `Status.ACTIVE` |
+| Type aliases | `PascalCase` | `DbSession` |
+| Private | `_leading_underscore` | `_hash_password` |
+| Dunder | Only for Python protocols | `__init__`, `__repr__` |
+
+**Never shadow builtins:** `list`, `dict`, `type`, `id`, `input`, `filter`, `map`, `hash`, `set`, `str`, `int`, `format`, `object`, `range`, `next`, `iter`, `open`, `all`, `any`, `sum`, `min`, `max`.
+
+Use domain-specific names instead: `user_id` not `id`, `items` not `list`, `user_type` not `type`.
+
+**Enums for domain states:**
+
+```python
+import enum
+
+class OrderStatus(enum.StrEnum):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    SHIPPED = "shipped"
+    CANCELLED = "cancelled"
+```
+
+---
+
+## 9. Async
+
+- **All I/O is async.** Use `async def` for routes, services, and repositories.
+- **httpx** for outbound HTTP, never `requests`.
+- **SQLAlchemy async** with `AsyncSession`, `create_async_engine`.
+- **Never call blocking I/O in async context** without `asyncio.to_thread()`.
+- File I/O: use `aiofiles` or `asyncio.to_thread(Path.read_text, ...)`.
+
+```python
+# ✅ Async HTTP client
+async def fetch_external(url: str) -> ExternalData:
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, timeout=10.0)
+        resp.raise_for_status()
+        return ExternalData.model_validate(resp.json())
+
+# ❌ Blocks the event loop
+def fetch_external(url: str) -> dict:
+    return requests.get(url).json()
+```
+
+---
+
+## 10. Testing
+
+### Setup
+
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+```
+
+### Naming
+
+```
+test_{method_or_action}_{scenario}_{expected_outcome}
+```
+
+```python
+async def test_create_user_duplicate_email_raises_conflict() -> None: ...
+async def test_get_user_nonexistent_id_returns_404() -> None: ...
+async def test_login_valid_credentials_returns_token() -> None: ...
+```
+
+### AAA Pattern — Arrange, Act, Assert
+
+```python
+async def test_create_user_success(
+    client: AsyncClient,
+    user_factory: UserFactory,
+) -> None:
+    # Arrange
+    payload = {"email": "new@example.com", "password": "strongpass123"}
+
+    # Act
+    response = await client.post("/api/v1/users", json=payload)
+
+    # Assert
+    assert response.status_code == 201
+    data = response.json()["data"]
+    assert data["email"] == "new@example.com"
+    assert "password" not in data
+```
+
+### Factories — Never Hardcode
+
+```python
+import factory
+from factory.alchemy import SQLAlchemyModelFactory
+
+class UserFactory(SQLAlchemyModelFactory):
+    class Meta:
+        model = User
+        sqlalchemy_session_persistence = "commit"
+
+    email = factory.Sequence(lambda n: f"user{n}@test.com")
+    display_name = factory.Faker("name")
+    hashed_password = factory.LazyFunction(lambda: hash_password("testpass123"))
+```
+
+### Fixtures
+
+```python
+@pytest.fixture
+async def db_session() -> AsyncIterator[AsyncSession]:
+    async with test_async_session() as session:
+        yield session
+        await session.rollback()
+
+@pytest.fixture
+async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as ac:
+        yield ac
+```
+
+### Mock at Boundaries
+
+```python
+# ✅ Mock the external boundary
+async def test_send_welcome_email(mocker: MockerFixture) -> None:
+    mock_send = mocker.patch("app.services.email.smtp_client.send")
+    await user_service.create(UserCreate(email="a@b.com", password="strongpass123"))
+    mock_send.assert_called_once()
+
+# ❌ Mock internals
+async def test_create_user(mocker: MockerFixture) -> None:
+    mocker.patch("app.services.user.UserService._validate_email")  # don't mock private methods
+```
+
+### Datetime Tests
+
+Use `freezegun` or `time-machine`:
+
+```python
+from freezegun import freeze_time
+
+@freeze_time("2024-01-15T12:00:00Z")
+async def test_token_expiry() -> None:
+    token = create_access_token(user_id=uuid4())
+    payload = decode_token(token)
+    assert payload["exp"] == 1705320600  # 12:30 UTC
+```
+
+### Coverage Requirements
+
+| Path | Minimum |
+|------|---------|
+| General business logic | 80% |
+| Authentication / authorization | 95% |
+| Payment / billing | 95% |
+| Data migrations | 90% |
+
+---
+
+## 11. API Design
+
+### URL Structure
+
+```
+/api/v1/{plural-resource}              # collection
+/api/v1/{plural-resource}/{id}         # single item
+/api/v1/{plural-resource}/{id}/{sub}   # nested resource
+```
+
+- Plural nouns: `/users`, `/orders`, `/line-items`
+- Kebab-case for multi-word resources: `/order-items`, not `/orderItems`
+- No verbs in URLs. Use HTTP methods: `POST /users` not `POST /create-user`
+- Version prefix: `/api/v1/`
+
+### HTTP Methods
+
+| Method | Usage | Success Code |
+|--------|-------|-------------|
+| `GET` | Read | 200 |
+| `POST` | Create | 201 |
+| `PUT` | Full replace | 200 |
+| `PATCH` | Partial update | 200 |
+| `DELETE` | Remove | 204 (no body) |
+
+### Response Shapes
+
+**Success — single:**
+```json
+{"data": {"id": "...", "email": "..."}}
+```
+
+**Success — list (always paginated):**
+```json
+{
+  "data": [{"id": "..."}, {"id": "..."}],
+  "meta": {"total": 142, "page": 1, "per_page": 20, "total_pages": 8}
+}
+```
+
+**Error:**
+```json
+{"error": {"code": "NOT_FOUND", "message": "User abc not found", "details": {"resource": "User", "id": "abc"}}}
+```
+
+### Pagination
+
+```python
+class PaginationParams(BaseModel):
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=20, ge=1, le=100)
+
+    @property
+    def offset(self) -> int:
+        return (self.page - 1) * self.per_page
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    data: list[T]
+    meta: PaginationMeta
+
+class PaginationMeta(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+```
+
+### Datetimes
+
+- Always UTC. Always ISO 8601: `2024-01-15T12:00:00Z`.
+- Store as `datetime` with `timezone.utc`. Serialize via Pydantic.
+- Never use naive datetimes.
+
+---
+
+## 12. Code Style Details
+
+### Strings
+
+- F-strings preferred. No function calls inside braces.
+- Multiline: use `textwrap.dedent` or parenthesized string concatenation.
+
+```python
+# ✅
+name = user.display_name
+msg = f"Welcome, {name}!"
+
+# ❌ Function call inside f-string
+msg = f"Welcome, {user.get_display_name()}!"
+```
+
+### Docstrings — Google Style, Imperative Mood
+
+```python
+async def get_user_by_email(email: str) -> User | None:
+    """Retrieve a user by email address.
+
+    Args:
+        email: The email address to search for.
+
+    Returns:
+        The matching user, or None if not found.
+
+    Raises:
+        DatabaseError: If the query fails.
+    """
+```
+
+Required on: all public functions, classes, and modules. Private helpers: optional but encouraged for non-obvious logic.
+
+### Trailing Commas
+
+Always on multiline structures:
+
+```python
+user = UserCreate(
+    email="test@example.com",
+    password="strongpass123",
+    display_name="Test User",  # trailing comma
+)
+```
+
+### Imports
+
+Ruff handles sorting. Logical order: stdlib → third-party → local. Use absolute imports.
+
+```python
+from __future__ import annotations
+
+import asyncio
+from collections.abc import AsyncIterator
+from uuid import UUID
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.deps import DbSession, CurrentUser
+from app.schemas.user import UserCreate, UserOut
+```
+
+---
+
+## 13. Anti-Patterns — Never Do These
+
+### Silent Exception Swallowing
+
+```python
+# ❌ NEVER
+try:
+    await send_email(user.email)
+except Exception:
+    pass
+
+# ✅ Log and re-raise, or handle specifically
+try:
+    await send_email(user.email)
+except SMTPError as exc:
+    logger.warning("Email send failed for %s: %s", user.email, exc)
+    raise NotificationError("Failed to send email") from exc
+```
+
+### Bare `except:`
+
+```python
+# ❌
+except:
+    ...
+
+# ❌
+except Exception:
+    pass
+
+# ✅ Catch specific exceptions
+except (ValueError, KeyError) as exc:
+    ...
+```
+
+### Mutable Default Arguments
+
+```python
+# ❌
+def process(items: list[str] = []) -> None: ...
+
+# ✅
+def process(items: list[str] | None = None) -> None:
+    items = items if items is not None else []
+```
+
+### Global Mutable State
+
+```python
+# ❌ Module-level mutable state
+_cache: dict[str, Any] = {}
+
+# ✅ Inject via dependency or use a proper cache service
+class CacheService:
+    def __init__(self) -> None:
+        self._store: dict[str, Any] = {}
+```
+
+### Business Logic in Routes
+
+See Section 3. Routes are thin dispatch layers only.
+
+### Raw Dict Returns
+
+```python
+# ❌
+return {"user": {"id": str(user.id), "email": user.email}}
+
+# ✅
+return UserResponse(data=UserOut.model_validate(user))
+```
+
+### `HTTPException` in Services
+
+```python
+# ❌ Service knows about HTTP
+from fastapi import HTTPException
+class UserService:
+    async def get(self, user_id: UUID) -> User:
+        user = await self.repo.get(user_id)
+        if not user:
+            raise HTTPException(404, "Not found")
+
+# ✅ Service raises domain exception
+class UserService:
+    async def get(self, user_id: UUID) -> User:
+        user = await self.repo.get(user_id)
+        if not user:
+            raise NotFoundError("User", user_id)
+```
+
+### Blocking Calls in Async
+
+```python
+# ❌ Blocks event loop
+content = open("file.txt").read()
+result = requests.get("https://api.example.com")
+time.sleep(5)
+
+# ✅
+content = await asyncio.to_thread(Path("file.txt").read_text)
+async with httpx.AsyncClient() as client:
+    result = await client.get("https://api.example.com")
+await asyncio.sleep(5)
+```
+
+---
+
+## Quick Reference Checklist
+
+Before submitting code, verify:
+
+- [ ] `from __future__ import annotations` at top of file
+- [ ] All functions have full type annotations (params + return)
+- [ ] No `Any` without comment justification
+- [ ] No shadowed builtins
+- [ ] Pydantic v2 patterns (`ConfigDict`, not inner `class Config`)
+- [ ] Domain exceptions, not `HTTPException` in services
+- [ ] Exception chaining (`raise X from exc`)
+- [ ] No bare `except:` or `except Exception: pass`
+- [ ] No mutable default arguments
+- [ ] Async for all I/O operations
+- [ ] Routes are thin — logic lives in services
+- [ ] Schemas split: Create / Update / Out
+- [ ] Tests follow AAA pattern with descriptive names
+- [ ] `ruff check .` and `mypy .` pass clean
