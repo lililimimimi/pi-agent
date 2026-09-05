@@ -47,3 +47,9 @@ def get_logger(name: str) -> Logger:
 - [ ] 启动后发一条消息，观察日志输出格式
 
 ## ⏸ 审核后继续
+
+## 验收标准
+- [ ] 安装依赖并通过所有测试：`pip install -e ".[dev]" && python -m pytest tests/ -v`
+- [ ] 无警告，无跳过（0 failed, 0 skipped）
+- [ ] 我审核代码通过
+- [ ] 我确认后才 commit

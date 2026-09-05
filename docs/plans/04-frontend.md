@@ -39,3 +39,9 @@ Vite + React 19 + TypeScript + Tailwind CSS + shadcn/ui + Zustand
 - [ ] 启动前后端联调：发消息 → 看到流式回复
 
 ## ⏸ 展示 tsc 结果 + 浏览器截图，审核后继续模块 5
+
+## 验收标准
+- [ ] 安装依赖并通过所有测试：`pip install -e ".[dev]" && python -m pytest tests/ -v`
+- [ ] 无警告，无跳过（0 failed, 0 skipped）
+- [ ] 我审核代码通过
+- [ ] 我确认后才 commit

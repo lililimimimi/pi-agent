@@ -33,3 +33,9 @@ yield SSEEvent("done")
 - [ ] 运行：`pytest tests/test_agent_core.py -v` → 全部通过
 
 ## ⏸ 展示测试结果，审核后继续模块 3
+
+## 验收标准
+- [ ] 安装依赖并通过所有测试：`pip install -e ".[dev]" && python -m pytest tests/ -v`
+- [ ] 无警告，无跳过（0 failed, 0 skipped）
+- [ ] 我审核代码通过
+- [ ] 我确认后才 commit

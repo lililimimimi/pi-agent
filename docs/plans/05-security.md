@@ -42,3 +42,9 @@ AgentLoop 在 `tool.execute()` 前调用，被拒则返回 `security_violation` 
 - [ ] `pytest tests/test_security.py -v` → 全部通过
 
 ## ⏸ 展示测试结果，审核后完成 Phase 1
+
+## 验收标准
+- [ ] 安装依赖并通过所有测试：`pip install -e ".[dev]" && python -m pytest tests/ -v`
+- [ ] 无警告，无跳过（0 failed, 0 skipped）
+- [ ] 我审核代码通过
+- [ ] 我确认后才 commit
