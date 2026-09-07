@@ -152,6 +152,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   initProvider: async () => {
+    // Only auto-detect if user hasn't manually chosen a provider
+    const saved = localStorage.getItem('provider')
+    if (saved) return
+
     const result = await fetchDefaultModel()
     if (result) {
       localStorage.setItem('provider', result.provider)
