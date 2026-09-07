@@ -39,6 +39,14 @@ description: 开发工作流规范。Git 分支策略、TDD 流程、双轴 Code
 - 💬 QUESTION → 必须回复
 - 👍 PRAISE → **每次 review 至少一个**
 
+## 报错处理规范
+
+遇到任何报错，必须：
+1. 先告诉我报错原因和分析
+2. 等我确认后再给出解决方案或代码
+
+不能直接给代码，必须先解释。
+
 ## 发布
 
 - Semver: `MAJOR.MINOR.PATCH`

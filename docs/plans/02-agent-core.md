@@ -25,17 +25,17 @@ yield SSEEvent("done")
 
 ## 步骤
 
-- [ ] 写 `types.py`（数据类型）
-- [ ] 写 `tools/base.py`（Tool ABC + check_approval + ToolRegistry）
-- [ ] 写 `models/base.py`（ModelProvider ABC + ModelRouter + MockProvider）
-- [ ] 写 `agent/core.py`（AgentLoop）
-- [ ] 写测试：纯文本响应 / 工具自动执行 / 工具需审批 / 未知工具
-- [ ] 运行：`pytest tests/test_agent_core.py -v` → 全部通过
+- [x] 写 `types.py`（数据类型）
+- [x] 写 `tools/base.py`（Tool ABC + check_approval + ToolRegistry）
+- [x] 写 `models/base.py`（ModelProvider ABC + ModelRouter + MockProvider）
+- [x] 写 `agent/core.py`（AgentLoop）
+- [x] 写测试：纯文本响应 / 工具自动执行 / 工具需审批 / 未知工具
+- [x] 运行：`pytest tests/test_agent_core.py -v` → 全部通过
 
 ## ⏸ 展示测试结果，审核后继续模块 3
 
 ## 验收标准
-- [ ] 安装依赖并通过所有测试：`pip install -e ".[dev]" && python -m pytest tests/ -v`
-- [ ] 无警告，无跳过（0 failed, 0 skipped）
-- [ ] 我审核代码通过
-- [ ] 我确认后才 commit
+- [x] 安装依赖并通过所有测试：`pip install -e ".[dev]" && python -m pytest tests/ -v`
+- [x] 无警告，无跳过（0 failed, 0 skipped）
+- [x] 我审核代码通过
+- [x] 我确认后才 commit

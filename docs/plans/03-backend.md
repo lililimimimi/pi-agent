@@ -33,18 +33,18 @@ data: {"event": "done",             "data": {}}
 
 ## 步骤
 
-- [ ] 写 `main.py`（FastAPI + MockProvider 开发模式）
-- [ ] 写 `api/chat.py`（POST + SSE stream）
-- [ ] 写 `models/claude.py`（stream + tool_use + usage 捕获）
-- [ ] 写三个 tool（read_file / write_file / git_tool）
-- [ ] 写 `logging.py`（loguru + contextvars correlation ID）
-- [ ] 写测试，运行：`pytest tests/ -v` → 全部通过
-- [ ] 启动验证：`uvicorn app.main:app --port 8000` + `curl /api/health`
+- [x] 写 `main.py`（FastAPI + MockProvider 开发模式）
+- [x] 写 `api/chat.py`（POST + SSE stream）
+- [x] 写 `models/claude.py`（stream + tool_use + usage 捕获）
+- [x] 写三个 tool（read_file / write_file / git_tool）
+- [x] 写 `logging.py`（loguru + contextvars correlation ID）
+- [x] 写测试，运行：`pytest tests/ -v` → 全部通过
+- [x] 启动验证：`uvicorn app.main:app --port 8000` + `curl /api/health`
 
 ## ⏸ 展示测试结果，审核后继续模块 4
 
 ## 验收标准
-- [ ] 安装依赖并通过所有测试：`pip install -e ".[dev]" && python -m pytest tests/ -v`
-- [ ] 无警告，无跳过（0 failed, 0 skipped）
-- [ ] 我审核代码通过
-- [ ] 我确认后才 commit
+- [x] 安装依赖并通过所有测试：`pip install -e ".[dev]" && python -m pytest tests/ -v`
+- [x] 无警告，无跳过（0 failed, 0 skipped）
+- [x] 我审核代码通过
+- [x] 我确认后才 commit
