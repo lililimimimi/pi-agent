@@ -44,6 +44,10 @@ class ModelRouter:
     def list_models(self) -> list[ModelInfo]:
         return [m for p in self._providers.values() for m in p.list_models()]
 
+    @property
+    def providers(self) -> dict[str, ModelProvider]:
+        return dict(self._providers)
+
 
 # ── Mock provider (dev / testing) ─────────────────────────────────────────────
 
