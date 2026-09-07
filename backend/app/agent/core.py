@@ -117,18 +117,19 @@ class AgentLoop:
                         tool_results.append(result)
                         continue
 
-                # Approval required — pause loop
-                if tool.check_approval(tc.arguments):
-                    yield SSEEvent(event="approval_request", data={
-                        "tool_call_id": tc.tool_call_id,
-                        "tool_name": tc.tool_name,
-                        "arguments": tc.arguments,
-                    })
-                    yield SSEEvent(event="waiting_for_approval", data={
-                        "tool_call_id": tc.tool_call_id,
-                    })
-                    paused = True
-                    break
+                # Approval required — SKIPPED for now (no resume mechanism).
+                # When approval flow is implemented, uncomment this block:
+                # if tool.check_approval(tc.arguments):
+                #     yield SSEEvent(event="approval_request", data={
+                #         "tool_call_id": tc.tool_call_id,
+                #         "tool_name": tc.tool_name,
+                #         "arguments": tc.arguments,
+                #     })
+                #     yield SSEEvent(event="waiting_for_approval", data={
+                #         "tool_call_id": tc.tool_call_id,
+                #     })
+                #     paused = True
+                #     break
 
                 # Auto-execute
                 result = await tool.execute(tc.arguments)

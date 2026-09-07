@@ -107,19 +107,25 @@ async def test_tool_auto_execute():
 
 @pytest.mark.asyncio
 async def test_tool_requires_approval():
-    """Tool with requires_approval=True pauses loop and emits approval_request."""
+    """Approval branch is skipped — tools with requires_approval=True auto-execute."""
     agent = make_agent(
-        responses=[[ToolCallChunk(tool_call_id="tc2", tool_name="dangerous", arguments={})]],
+        responses=[
+            [ToolCallChunk(tool_call_id="tc2", tool_name="dangerous", arguments={})],
+            [TextChunk(content="done")],
+        ],
         tools=[ApprovalTool()],
     )
     events = await collect(agent.run("scripted", "s-1", [Message(role=Role.USER, content="do it")]))
 
     types = [e.event for e in events]
     assert "tool_call" in types
-    assert "approval_request" in types
-    assert "waiting_for_approval" in types
-    # Loop is paused, no "done" yet — last event is waiting_for_approval
-    assert events[-1].event == "waiting_for_approval"
+    # Approval is skipped, tool auto-executes
+    assert "approval_request" not in types
+    assert "waiting_for_approval" not in types
+    assert "tool_result" in types
+    result_event = next(e for e in events if e.event == "tool_result")
+    assert result_event.data["output"] == "executed"
+    assert events[-1].event == "done"
 
 
 @pytest.mark.asyncio
