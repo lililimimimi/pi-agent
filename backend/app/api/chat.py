@@ -1,23 +1,25 @@
 """
 Chat API routes:
   POST /api/chat              → create session, return {session_id}
-  GET  /api/chat/stream/{id} → SSE stream from AgentLoop
+  GET  /api/chat/stream/{id} → proxy SSE stream from pi-bridge
   POST /api/tool/approve      → signal approval decision for a paused tool call
   GET  /api/health            → liveness probe
 """
 from __future__ import annotations
 
 import asyncio
-import json
+import os
 import uuid
 from typing import Any, AsyncIterator
 
+import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.agent.core import AgentLoop
 from app.types import Message, Role
+
+BRIDGE_URL = os.getenv("PI_BRIDGE_URL", "http://localhost:3100")
 
 router = APIRouter(prefix="/api")
 
@@ -96,29 +98,27 @@ async def create_chat(req: ChatRequest) -> dict[str, str]:
 
 @router.get("/chat/stream/{session_id}")
 async def stream_chat(session_id: str) -> StreamingResponse:
-    """Stream SSE events for an existing session."""
+    """Stream SSE events by proxying to pi-bridge."""
     session = _get_session(session_id)
 
-    # Import registries lazily to allow tests to patch them after import time.
-    import app.container as container
-
-    agent = AgentLoop(
-        model_router=container.model_router,
-        tool_registry=container.tool_registry,
-        security_interceptor=container.security_interceptor,
-    )
-
-    async def _generate() -> AsyncIterator[str]:
-        async for sse_event in agent.run(
-            provider_name=session.provider,
-            model_id=session.model,
-            messages=session.messages,
-        ):
-            payload = json.dumps(sse_event.model_dump())
-            yield f"data: {payload}\n\n"
+    async def _proxy() -> AsyncIterator[str]:
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream(
+                "POST",
+                f"{BRIDGE_URL}/chat",
+                json={
+                    "messages": [
+                        {"role": m.role.value, "content": m.content}
+                        for m in session.messages
+                    ],
+                },
+            ) as resp:
+                async for line in resp.aiter_lines():
+                    if line.startswith("data: "):
+                        yield f"{line}\n\n"
 
     return StreamingResponse(
-        _generate(),
+        _proxy(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
