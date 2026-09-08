@@ -1,12 +1,11 @@
 import { useState, useRef, type KeyboardEvent, type ChangeEvent } from 'react'
-import { Button } from '@/components/ui/button'
 import { useChatStore } from '@/stores/chatStore'
-import { Send, Paperclip, X } from 'lucide-react'
+import { ArrowUp, Paperclip, X } from 'lucide-react'
 import type { ImageAttachment } from '@/types'
 
 let attachCounter = 0
 
-export function InputBar() {
+export function InputBar({ bare = false }: { bare?: boolean }) {
   const [text, setText] = useState('')
   const [images, setImages] = useState<ImageAttachment[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
@@ -17,7 +16,6 @@ export function InputBar() {
 
   const handleSend = () => {
     if (!canSend) return
-    // TODO: attach images to message when backend supports it
     sendMessage(text.trim())
     setText('')
     setImages([])
@@ -45,7 +43,6 @@ export function InputBar() {
       }
       reader.readAsDataURL(file)
     })
-    // Reset so same file can be selected again
     e.target.value = ''
   }
 
@@ -53,65 +50,74 @@ export function InputBar() {
     setImages((prev) => prev.filter((img) => img.id !== id))
   }
 
-  return (
-    <div className="border-t bg-background p-3">
-      {/* Image previews */}
-      {images.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-2">
-          {images.map((img) => (
-            <div key={img.id} className="relative">
-              <img
-                src={img.dataUrl}
-                alt={img.name}
-                className="h-16 rounded-md"
-              />
-              <button
-                onClick={() => removeImage(img.id)}
-                className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
+  const inner = (
+    <div className="max-w-2xl mx-auto">
+        {/* Image previews */}
+        {images.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {images.map((img) => (
+              <div key={img.id} className="relative group">
+                <img
+                  src={img.dataUrl}
+                  alt={img.name}
+                  className="h-16 rounded-xl object-cover border border-border/50"
+                />
+                <button
+                  onClick={() => removeImage(img.id)}
+                  className="absolute -top-1.5 -right-1.5 bg-foreground/80 text-background rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Spotlight-style input container */}
+        <div className="flex items-end gap-2 bg-card rounded-2xl border border-border shadow-sm px-4 py-3 transition-shadow focus-within:shadow-md focus-within:border-foreground/20">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+          />
+
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="shrink-0 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          >
+            <Paperclip className="h-4 w-4" />
+          </button>
+
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Message pi…"
+            rows={1}
+            className="flex-1 resize-none bg-transparent text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none min-h-[24px] max-h-[200px]"
+          />
+
+          <button
+            disabled={!canSend}
+            onClick={handleSend}
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-foreground text-background disabled:opacity-20 transition-opacity"
+          >
+            <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
+          </button>
         </div>
-      )}
 
-      <div className="flex items-end gap-2">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => fileRef.current?.click()}
-          className="shrink-0"
-        >
-          <Paperclip className="h-4 w-4" />
-        </Button>
-
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Type a message..."
-          rows={1}
-          className="flex-1 resize-none rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        />
-
-        <Button
-          size="icon"
-          disabled={!canSend}
-          onClick={handleSend}
-          className="shrink-0"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
-      </div>
+        <p className="text-[11px] text-muted-foreground/50 text-center mt-2.5 font-normal">
+          Press Enter to send · Shift+Enter for new line
+        </p>
     </div>
+  )
+
+  if (bare) return inner
+
+  return (
+    <div className="px-6 pb-6 pt-2 bg-background">{inner}</div>
   )
 }

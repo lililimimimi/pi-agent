@@ -84,6 +84,17 @@ export async function approveToolCall(
 }
 
 /**
+ * Fetch all available models from the backend.
+ */
+export async function fetchModels(): Promise<
+  { id: string; name: string; provider: string; supports_tools: boolean }[]
+> {
+  const res = await fetch(`${BASE}/models`)
+  if (!res.ok) throw new Error(`Failed to fetch models: ${res.status}`)
+  return await res.json()
+}
+
+/**
  * Fetch the recommended default provider + model from the backend.
  * Returns null if the backend is unreachable.
  */

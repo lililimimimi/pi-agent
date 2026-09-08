@@ -8,16 +8,16 @@ export function TokenCounter() {
   if (total === 0) return null
 
   return (
-    <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+    <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground/70 tabular-nums">
       <span className="flex items-center gap-0.5">
-        <ArrowUp className="h-3 w-3" />
+        <ArrowUp className="h-2.5 w-2.5" />
         {inputTokens.toLocaleString()}
       </span>
       <span className="flex items-center gap-0.5">
-        <ArrowDown className="h-3 w-3" />
+        <ArrowDown className="h-2.5 w-2.5" />
         {outputTokens.toLocaleString()}
       </span>
-      <span className="text-foreground/50">•</span>
+      <span className="text-border">·</span>
       <span>{total.toLocaleString()}</span>
     </div>
   )

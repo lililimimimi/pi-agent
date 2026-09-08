@@ -1,6 +1,9 @@
-# 模块 5：安全限制
+# Pi SDK Integration
 
-- [x] 写 `security.py`（InterceptResult + CommandAllowlist + SecurityInterceptor）
-- [x] 写测试：路径越界 / 危险命令 / 白名单通过 / git 操作通过
-- [x] 注入 AgentLoop：确认 `__init__` 已接受 `security_interceptor` 参数（已预置）
-- [x] `pytest tests/test_security.py -v` → 全部通过（37 passed）
+- [ ] Task 1: 初始化 `pi-bridge/` 项目，安装 Express + Pi SDK
+- [ ] Task 2: 实现 `server.ts`：createAgentSession → SSE 流，映射事件
+- [ ] Task 3: 实现 `/approve` POST 端点，转发权限决策
+- [ ] Task 4: 修改 `chat.py`：proxy 模式转发到 bridge
+- [ ] Task 5: 修改 `types.py`：增加 PermissionRequestEvent
+- [ ] Task 6: 写 bridge 集成测试
+- [ ] Task 7: 端到端验证

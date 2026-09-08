@@ -5,15 +5,18 @@ import json
 import os
 from typing import Any, AsyncIterator
 
+import httpx
+from loguru import logger
+
 from app.models.base import ModelProvider, ModelInfo
 from app.types import Message, Role, TextChunk, ToolCallChunk
 
 
 # ---------------------------------------------------------------------------
-# Supported models
+# Default models (used when remote listing fails or for direct DeepSeek API)
 # ---------------------------------------------------------------------------
 
-_MODELS: list[ModelInfo] = [
+_DEFAULT_MODELS: list[ModelInfo] = [
     ModelInfo(
         id="deepseek-chat",
         name="DeepSeek V3",
@@ -27,6 +30,22 @@ _MODELS: list[ModelInfo] = [
         supports_tools=False,
     ),
 ]
+
+# Only keep coding-capable models
+_CODING_MODELS = {
+    "deepseek-ai/DeepSeek-V4-Flash",
+    "deepseek-ai/DeepSeek-V4-Pro",
+    "deepseek-ai/DeepSeek-V3.2",
+    "deepseek-ai/DeepSeek-V3",
+    "deepseek-ai/DeepSeek-R1",
+    "moonshotai/Kimi-K2.7-Code",
+    "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+    "Qwen/Qwen3.5-397B-A17B",
+    "Qwen/Qwen3.5-27B",
+    "Qwen/Qwen3-32B",
+    "Qwen/Qwen3-8B",
+    "THUDM/GLM-4-32B-0414",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -124,14 +143,56 @@ class DeepSeekProvider(ModelProvider):
                 "Install it with: pip install openai"
             ) from exc
 
-        resolved_url = base_url or os.getenv("DEEPSEEK_BASE_URL") or self._BASE_URL
+        self._resolved_url = base_url or os.getenv("DEEPSEEK_BASE_URL") or self._BASE_URL
+        self._api_key = api_key or os.getenv("DEEPSEEK_API_KEY") or ""
         self._client = AsyncOpenAI(
-            api_key=api_key or os.getenv("DEEPSEEK_API_KEY"),
-            base_url=resolved_url,
+            api_key=self._api_key,
+            base_url=self._resolved_url,
         )
 
+        # Fetch remote model list for non-default endpoints (e.g. SiliconFlow)
+        if self._resolved_url != self._BASE_URL:
+            self._cached_models = self._fetch_remote_models()
+        else:
+            self._cached_models = None
+
     def list_models(self) -> list[ModelInfo]:
-        return list(_MODELS)
+        if self._cached_models is not None:
+            return list(self._cached_models)
+        return list(_DEFAULT_MODELS)
+
+    def _fetch_remote_models(self) -> list[ModelInfo]:
+        """Sync fetch model list from the API (called once at init)."""
+        try:
+            resp = httpx.get(
+                f"{self._resolved_url}/models",
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json().get("data", [])
+
+            models: list[ModelInfo] = []
+            for m in data:
+                model_id: str = m["id"]
+                # Only keep coding-capable models
+                if model_id not in _CODING_MODELS:
+                    continue
+
+                # Use the part after "/" as display name, or full id
+                name = model_id.split("/")[-1] if "/" in model_id else model_id
+                models.append(ModelInfo(
+                    id=model_id,
+                    name=name,
+                    provider=self.provider_name,
+                    supports_tools=True,
+                ))
+
+            logger.info(f"Fetched {len(models)} chat models from {self._resolved_url}")
+            return models if models else list(_DEFAULT_MODELS)
+        except Exception as e:
+            logger.warning(f"Failed to fetch remote models: {e}, using defaults")
+            return list(_DEFAULT_MODELS)
 
     async def chat_stream(
         self,

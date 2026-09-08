@@ -43,4 +43,5 @@ export type SSEEventData =
   | { event: 'tool_result'; data: { tool_call_id: string; output: string; is_error: boolean } }
   | { event: 'usage'; data: { input_tokens: number; output_tokens: number } }
   | { event: 'done'; data: Record<string, never> }
+  | { event: 'permission_request'; data: { tool_call_id: string; tool_name: string; arguments: Record<string, unknown> } }
   | { event: 'error'; data: { message: string } }

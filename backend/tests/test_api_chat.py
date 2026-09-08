@@ -1,41 +1,21 @@
 """
-Integration tests for the FastAPI HTTP layer (Module 3).
+Integration tests for the FastAPI HTTP layer.
 
 Uses httpx AsyncClient + ASGITransport — no real server required.
-Patches app.container registries with MockProvider for isolation.
+Stream tests mock the pi-bridge proxy to avoid needing a running bridge.
 """
 from __future__ import annotations
 
 import json
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-
-import app.container as container
-from app.models.base import MockProvider, ModelRouter
-from app.tools.base import ToolRegistry
 
 
 # --------------------------------------------------------------------------- #
 # Fixtures
 # --------------------------------------------------------------------------- #
-
-@pytest.fixture(autouse=True)
-def _patch_registries():
-    """Replace global registries with clean mock instances for every test."""
-    original_router = container.model_router
-    original_registry = container.tool_registry
-
-    router = ModelRouter()
-    router.register(MockProvider())
-    container.model_router = router
-    container.tool_registry = ToolRegistry()
-
-    yield
-
-    container.model_router = original_router
-    container.tool_registry = original_registry
-
 
 @pytest.fixture
 async def client():
@@ -85,7 +65,7 @@ async def test_post_chat_returns_session_id(client: AsyncClient):
 
 
 async def test_stream_returns_text_and_done(client: AsyncClient):
-    """SSE stream for mock provider must contain text + done events."""
+    """SSE stream proxied from bridge must contain text + done events."""
     r = await client.post(
         "/api/chat",
         json={
@@ -96,7 +76,30 @@ async def test_stream_returns_text_and_done(client: AsyncClient):
     )
     session_id = r.json()["session_id"]
 
-    stream_r = await client.get(f"/api/chat/stream/{session_id}")
+    # Mock the bridge SSE response
+    fake_lines = [
+        'data: {"event": "text", "data": {"content": "Hello!"}}',
+        'data: {"event": "done", "data": {}}',
+    ]
+
+    async def _fake_aiter_lines():
+        for line in fake_lines:
+            yield line
+
+    mock_resp = AsyncMock()
+    mock_resp.aiter_lines = _fake_aiter_lines
+
+    mock_client_instance = AsyncMock()
+    mock_stream_ctx = AsyncMock()
+    mock_stream_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_stream_ctx.__aexit__ = AsyncMock(return_value=False)
+    mock_client_instance.stream = MagicMock(return_value=mock_stream_ctx)
+    mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+    mock_client_instance.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("app.api.chat.httpx.AsyncClient", return_value=mock_client_instance):
+        stream_r = await client.get(f"/api/chat/stream/{session_id}")
+
     assert stream_r.status_code == 200
     assert "text/event-stream" in stream_r.headers["content-type"]
 
@@ -107,8 +110,8 @@ async def test_stream_returns_text_and_done(client: AsyncClient):
     assert events[-1]["event"] == "done", f"Last event is not 'done': {event_types}"
 
 
-async def test_stream_text_content_matches_mock(client: AsyncClient):
-    """Mock provider echoes the last message — verify content is present."""
+async def test_stream_text_content_matches_proxy(client: AsyncClient):
+    """Verify text content is correctly proxied from bridge."""
     r = await client.post(
         "/api/chat",
         json={
@@ -119,9 +122,30 @@ async def test_stream_text_content_matches_mock(client: AsyncClient):
     )
     session_id = r.json()["session_id"]
 
-    stream_r = await client.get(f"/api/chat/stream/{session_id}")
-    events = _parse_sse_lines(stream_r.text)
+    fake_lines = [
+        'data: {"event": "text", "data": {"content": "echo: ping me"}}',
+        'data: {"event": "done", "data": {}}',
+    ]
 
+    async def _fake_aiter_lines():
+        for line in fake_lines:
+            yield line
+
+    mock_resp = AsyncMock()
+    mock_resp.aiter_lines = _fake_aiter_lines
+
+    mock_client_instance = AsyncMock()
+    mock_stream_ctx = AsyncMock()
+    mock_stream_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_stream_ctx.__aexit__ = AsyncMock(return_value=False)
+    mock_client_instance.stream = MagicMock(return_value=mock_stream_ctx)
+    mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+    mock_client_instance.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("app.api.chat.httpx.AsyncClient", return_value=mock_client_instance):
+        stream_r = await client.get(f"/api/chat/stream/{session_id}")
+
+    events = _parse_sse_lines(stream_r.text)
     text_events = [e for e in events if e["event"] == "text"]
     combined = "".join(e["data"]["content"] for e in text_events)
     assert "ping me" in combined
@@ -168,8 +192,8 @@ async def test_approve_unknown_session_returns_404(client: AsyncClient):
     assert r.status_code == 404
 
 
-async def test_stream_unknown_provider_emits_error_event(client: AsyncClient):
-    """If provider is unknown, SSE stream must emit an 'error' event."""
+async def test_stream_bridge_error_is_proxied(client: AsyncClient):
+    """If bridge returns an error event, it is proxied through."""
     r = await client.post(
         "/api/chat",
         json={
@@ -180,9 +204,30 @@ async def test_stream_unknown_provider_emits_error_event(client: AsyncClient):
     )
     session_id = r.json()["session_id"]
 
-    stream_r = await client.get(f"/api/chat/stream/{session_id}")
-    assert stream_r.status_code == 200
+    fake_lines = [
+        'data: {"event": "error", "data": {"message": "no-such-provider"}}',
+        'data: {"event": "done", "data": {}}',
+    ]
 
+    async def _fake_aiter_lines():
+        for line in fake_lines:
+            yield line
+
+    mock_resp = AsyncMock()
+    mock_resp.aiter_lines = _fake_aiter_lines
+
+    mock_client_instance = AsyncMock()
+    mock_stream_ctx = AsyncMock()
+    mock_stream_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_stream_ctx.__aexit__ = AsyncMock(return_value=False)
+    mock_client_instance.stream = MagicMock(return_value=mock_stream_ctx)
+    mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+    mock_client_instance.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("app.api.chat.httpx.AsyncClient", return_value=mock_client_instance):
+        stream_r = await client.get(f"/api/chat/stream/{session_id}")
+
+    assert stream_r.status_code == 200
     events = _parse_sse_lines(stream_r.text)
     assert events[0]["event"] == "error"
     assert "no-such-provider" in events[0]["data"]["message"]

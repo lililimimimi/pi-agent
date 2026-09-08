@@ -98,9 +98,10 @@ class TestDeepSeekProviderMetadata:
         ids = [m.id for m in models]
         assert "deepseek-chat" in ids
 
-    def test_default_base_url(self):
+    def test_default_base_url(self, monkeypatch):
         from app.models.deepseek import DeepSeekProvider
 
+        monkeypatch.delenv("DEEPSEEK_BASE_URL", raising=False)
         provider = DeepSeekProvider(api_key="test-key")
         assert str(provider._client.base_url).rstrip("/").endswith("api.deepseek.com")
 
