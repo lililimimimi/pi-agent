@@ -189,6 +189,14 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.listen(PORT, () => {
-  console.log(`pi-bridge listening on port ${PORT}`);
-});
+export { app };
+
+// Only start listening when run directly (not imported for testing)
+const isMainModule =
+  process.argv[1] &&
+  import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"));
+if (isMainModule) {
+  app.listen(PORT, () => {
+    console.log(`pi-bridge listening on port ${PORT}`);
+  });
+}
