@@ -54,3 +54,9 @@ class Message(BaseModel):
 class SSEEvent(BaseModel):
     event: str
     data: dict[str, Any]
+
+
+class PermissionRequestEvent(BaseModel):
+    """SSE event emitted when a dangerous tool needs user approval."""
+    event: str = Field(default="permission_request", frozen=True)
+    data: dict[str, Any]  # tool_call_id, tool_name, arguments
