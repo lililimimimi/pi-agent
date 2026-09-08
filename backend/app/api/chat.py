@@ -111,6 +111,7 @@ async def stream_chat(session_id: str) -> StreamingResponse:
                         {"role": m.role.value, "content": m.content}
                         for m in session.messages
                     ],
+                    "model": f"{session.provider}/{session.model}",
                 },
             ) as resp:
                 async for line in resp.aiter_lines():

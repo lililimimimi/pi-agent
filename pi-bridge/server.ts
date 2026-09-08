@@ -5,6 +5,7 @@ import {
   ModelRuntime,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
@@ -28,7 +29,9 @@ app.use(express.json());
 
 // POST /chat — create session + stream SSE
 app.post("/chat", async (req, res) => {
-  const { messages, cwd = process.cwd() } = req.body;
+  const { messages, cwd = process.cwd(), model: modelSpec } = req.body;
+  // modelSpec format: "provider/model-id" e.g. "anthropic/claude-sonnet-4-5"
+  const DEFAULT_MODEL = process.env.PI_BRIDGE_MODEL || "anthropic/claude-sonnet-4-5";
 
   // Set SSE headers
   res.setHeader("Content-Type", "text/event-stream");
@@ -56,11 +59,17 @@ app.post("/chat", async (req, res) => {
 
   let session: AgentSession;
   try {
+    // Resolve model
+    const spec = (modelSpec as string) || DEFAULT_MODEL;
+    const [provider, modelId] = spec.includes("/") ? spec.split("/", 2) : ["anthropic", spec];
+    const model = runtime.getModel(provider, modelId);
+
     const result = await createAgentSession({
       cwd,
       sessionManager: SessionManager.inMemory(),
       modelRuntime: runtime,
       tools: ["read", "bash", "edit", "write"],
+      ...(model ? { model } : {}),
     });
     session = result.session;
   } catch (err: unknown) {
@@ -88,6 +97,7 @@ app.post("/chat", async (req, res) => {
 
   // Subscribe to session events
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
+
     switch (event.type) {
       case "message_update": {
         const ame = event.assistantMessageEvent;
@@ -117,23 +127,25 @@ app.post("/chat", async (req, res) => {
         break;
 
       case "agent_end": {
-        // Extract usage from the messages
+        // Extract usage and errors from the messages
         const msgs = event.messages || [];
         for (const msg of msgs) {
-          if (
-            "role" in msg &&
-            msg.role === "assistant" &&
-            "usage" in msg &&
-            msg.usage
-          ) {
-            const usage = msg.usage as {
-              input: number;
-              output: number;
+          if ("role" in msg && msg.role === "assistant") {
+            const assistantMsg = msg as {
+              usage?: { input: number; output: number };
+              stopReason?: string;
+              errorMessage?: string;
             };
-            send("usage", {
-              input_tokens: usage.input || 0,
-              output_tokens: usage.output || 0,
-            });
+            // Send error if model returned an error
+            if (assistantMsg.stopReason === "error" && assistantMsg.errorMessage) {
+              send("error", { message: assistantMsg.errorMessage });
+            }
+            if (assistantMsg.usage) {
+              send("usage", {
+                input_tokens: assistantMsg.usage.input || 0,
+                output_tokens: assistantMsg.usage.output || 0,
+              });
+            }
           }
         }
         send("done", {});
