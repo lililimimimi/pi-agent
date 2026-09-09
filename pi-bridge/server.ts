@@ -24,10 +24,17 @@ const PROVIDER_KEY_ENV: Record<string, string> = {
 };
 
 // Model ID overrides: when frontend sends non-Pi-SDK model IDs
-// e.g. "deepseek-ai/DeepSeek-V3" → "deepseek-v4-flash"
 const MODEL_ALIASES: Record<string, string> = {
   "deepseek-ai/DeepSeek-V3": "deepseek-v4-flash",
+  "deepseek-ai/DeepSeek-V4-Pro": "deepseek-v4-pro",
   "deepseek-ai/DeepSeek-R1": "deepseek-v4-pro",
+  "deepseek-ai/DeepSeek-V2.5": "deepseek-v4-flash",
+};
+
+// Default model per provider when alias/lookup fails
+const PROVIDER_DEFAULT_MODEL: Record<string, string> = {
+  deepseek: "deepseek-v4-flash",
+  anthropic: "claude-sonnet-4-5",
 };
 
 let modelRuntimeInstance: ModelRuntime | undefined;
@@ -46,10 +53,11 @@ async function getModelRuntime(provider: string): Promise<ModelRuntime> {
 
 const sessions = new Map<string, AgentSession>();
 
-export const app = express();
+const app = express();
 app.use(express.json());
 
 app.post("/chat", async (req, res) => {
+  console.log(`[bridge] POST /chat body:`, JSON.stringify(req.body)?.slice(0, 200));
   const { messages, provider = "anthropic", model: rawModel } = req.body;
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -64,7 +72,9 @@ app.post("/chat", async (req, res) => {
 
   let runtime: ModelRuntime;
   try {
+    console.log(`[bridge] getModelRuntime provider=${provider}`);
     runtime = await getModelRuntime(provider);
+    console.log(`[bridge] runtime ready`);
   } catch (err: unknown) {
     send("error", { message: err instanceof Error ? err.message : "Failed to init runtime" });
     send("done", {});
@@ -72,12 +82,20 @@ app.post("/chat", async (req, res) => {
     return;
   }
 
-  // Resolve model: alias first, then look up in runtime
+  // Resolve model: alias first, then look up in runtime, then fallback to provider default
   const modelId = MODEL_ALIASES[rawModel] ?? rawModel;
-  const model = runtime.getModel(provider, modelId);
+  let model = runtime.getModel(provider, modelId);
+  if (!model && PROVIDER_DEFAULT_MODEL[provider]) {
+    const fallbackId = PROVIDER_DEFAULT_MODEL[provider];
+    model = runtime.getModel(provider, fallbackId);
+    console.log(`[bridge] model ${modelId} not found, fallback to ${fallbackId} found=${!!model}`);
+  } else {
+    console.log(`[bridge] model resolved: ${provider}/${modelId} found=${!!model}`);
+  }
 
   let session: AgentSession;
   try {
+    console.log(`[bridge] createAgentSession...`);
     const result = await createAgentSession({
       sessionManager: SessionManager.inMemory(),
       modelRuntime: runtime,
@@ -179,9 +197,7 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-const isMain = process.argv[1] && import.meta.url.endsWith(
-  process.argv[1].replace(/\\/g, "/")
-);
-if (isMain) {
-  app.listen(PORT, () => console.log(`pi-bridge listening on port ${PORT}`));
-}
+app.listen(PORT, () => console.log(`pi-bridge listening on port ${PORT}`));
+
+// Keep process alive (Pi SDK imports may otherwise drain the event loop)
+setInterval(() => {}, 1 << 30);

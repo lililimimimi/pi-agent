@@ -47,6 +47,13 @@ description: 开发工作流规范。Git 分支策略、TDD 流程、双轴 Code
 
 不能直接给代码，必须先解释。
 
+## Session 结束规范
+
+每个 session 结束前必须更新 PROGRESS.md：
+- 这个 session 做了什么
+- 下一个 session 从哪里继续
+- 有什么未解决的问题
+
 ## 发布
 
 - Semver: `MAJOR.MINOR.PATCH`
