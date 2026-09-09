@@ -9,13 +9,14 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "express": "^5.1.0",
-    "@earendil-works/pi-coding-agent": "^0.85.1"
+    "@earendil-works/pi-coding-agent": "^0.85.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.0",
-    "typescript": "^5.8.0",
-    "tsx": "^4.19.0"
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
   }
 }
