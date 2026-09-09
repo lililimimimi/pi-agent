@@ -1,13 +1,14 @@
 """
 Chat API routes:
   POST /api/chat              → create session, return {session_id}
-  GET  /api/chat/stream/{id} → proxy SSE stream from pi-bridge
+  GET  /api/chat/stream/{id} → proxy to pi-bridge (anthropic) or AgentLoop (others)
   POST /api/tool/approve      → signal approval decision for a paused tool call
   GET  /api/health            → liveness probe
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import uuid
 from typing import Any, AsyncIterator
@@ -17,9 +18,12 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from app.agent.core import AgentLoop
 from app.types import Message, Role
 
 BRIDGE_URL = os.getenv("PI_BRIDGE_URL", "http://localhost:3100")
+# Providers routed through pi-bridge (Pi SDK handles auth)
+BRIDGE_PROVIDERS = {"anthropic", "claude"}
 
 router = APIRouter(prefix="/api")
 
@@ -37,7 +41,6 @@ class _Session:
         self.messages = messages
         self.provider = provider
         self.model = model
-        # tool_call_id → (Event, result-holder)
         self.approval_events: dict[str, asyncio.Event] = {}
         self.approval_results: dict[str, bool] = {}
 
@@ -66,6 +69,14 @@ class ApproveRequest(BaseModel):
     session_id: str
     tool_call_id: str
     approved: bool
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _sse(event: str, data: dict[str, Any]) -> str:
+    return f"data: {json.dumps({'event': event, 'data': data})}\n\n"
 
 
 # ---------------------------------------------------------------------------
@@ -98,8 +109,17 @@ async def create_chat(req: ChatRequest) -> dict[str, str]:
 
 @router.get("/chat/stream/{session_id}")
 async def stream_chat(session_id: str) -> StreamingResponse:
-    """Stream SSE events by proxying to pi-bridge."""
+    """Stream SSE events. Routes to pi-bridge for Anthropic, AgentLoop for others."""
     session = _get_session(session_id)
+
+    if session.provider in BRIDGE_PROVIDERS:
+        return _stream_via_bridge(session)
+    else:
+        return _stream_via_agent_loop(session)
+
+
+def _stream_via_bridge(session: _Session) -> StreamingResponse:
+    """Proxy to pi-bridge for Anthropic/Claude models."""
 
     async def _proxy() -> AsyncIterator[str]:
         async with httpx.AsyncClient(timeout=None) as client:
@@ -121,11 +141,32 @@ async def stream_chat(session_id: str) -> StreamingResponse:
     return StreamingResponse(
         _proxy(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
+
+
+def _stream_via_agent_loop(session: _Session) -> StreamingResponse:
+    """Run local AgentLoop for non-Anthropic providers (e.g. DeepSeek)."""
+    import app.container as container
+
+    agent = AgentLoop(
+        model_router=container.model_router,
+        tool_registry=container.tool_registry,
+        security_interceptor=container.security_interceptor,
+    )
+
+    async def _generate() -> AsyncIterator[str]:
+        async for sse_event in agent.run(
+            provider_name=session.provider,
+            model_id=session.model,
+            messages=session.messages,
+        ):
+            yield f"data: {sse_event.model_dump_json()}\n\n"
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
     )
 
 

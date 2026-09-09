@@ -120,8 +120,8 @@ async def test_tool_execution_flow(client: AsyncClient):
         "/api/chat",
         json={
             "messages": [{"role": "user", "content": "read pyproject.toml"}],
-            "provider": "mock",
-            "model": "mock-1",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-5",
         },
     )
     session_id = r.json()["session_id"]
@@ -155,8 +155,8 @@ async def test_permission_request_proxied(client: AsyncClient):
         "/api/chat",
         json={
             "messages": [{"role": "user", "content": "write file"}],
-            "provider": "mock",
-            "model": "mock-1",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-5",
         },
     )
     session_id = r.json()["session_id"]
