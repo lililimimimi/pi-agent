@@ -1,6 +1,6 @@
 import { useState, useRef, type KeyboardEvent, type ChangeEvent } from 'react'
 import { useChatStore } from '@/stores/chatStore'
-import { ArrowUp, Paperclip, X } from 'lucide-react'
+import { ArrowUp, Paperclip, Square, X } from 'lucide-react'
 import type { ImageAttachment } from '@/types'
 
 let attachCounter = 0
@@ -10,6 +10,7 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
   const [images, setImages] = useState<ImageAttachment[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const sendMessage = useChatStore((s) => s.sendMessage)
+  const stopAgent = useChatStore((s) => s.stopAgent)
   const isStreaming = useChatStore((s) => s.isStreaming)
 
   const canSend = text.trim().length > 0 && !isStreaming
@@ -22,7 +23,8 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Enter (no shift) or Cmd+Enter → send
+    if (e.key === 'Enter' && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
       e.preventDefault()
       handleSend()
     }
@@ -100,13 +102,22 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
             className="flex-1 resize-none bg-transparent text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none min-h-[24px] max-h-[200px]"
           />
 
-          <button
-            disabled={!canSend}
-            onClick={handleSend}
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-foreground text-background disabled:opacity-20 transition-opacity"
-          >
-            <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
-          </button>
+          {isStreaming ? (
+            <button
+              onClick={stopAgent}
+              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-muted text-muted-foreground hover:bg-muted-foreground/20 transition-colors"
+            >
+              <Square className="h-3 w-3" fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              disabled={!canSend}
+              onClick={handleSend}
+              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-foreground text-background disabled:opacity-20 transition-opacity"
+            >
+              <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          )}
         </div>
 
         <p className="text-[11px] text-muted-foreground/50 text-center mt-2.5 font-normal">

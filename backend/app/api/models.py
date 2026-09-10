@@ -1,35 +1,54 @@
 """
 Models API routes:
-  GET /api/models         → list of available models across all providers
-  GET /api/models/default → first available non-mock provider + model (fallback: mock)
+  GET /api/models         → proxy pi-bridge /models (source of truth)
+  GET /api/models/default → proxy pi-bridge /models/default
 """
 from __future__ import annotations
+import os
 
+import httpx
 from fastapi import APIRouter
 
-import app.container as container
-
 router = APIRouter(prefix="/api")
+
+BRIDGE = os.getenv("PI_BRIDGE_URL", "http://localhost:3100")
 
 
 @router.get("/models")
 async def list_models() -> list[dict]:
-    """Return all registered models from all providers."""
-    return [m.model_dump() for m in container.model_router.list_models()]
+    """Return available models.
+
+    Priority:
+    1. pi-bridge /models  — the pi SDK knows all real model IDs
+    2. config.json (enabled + connected providers) — fallback when bridge is down
+    """
+    from app.config.providers import get_all_enabled_models
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            r = await client.get(f"{BRIDGE}/models")
+            if r.status_code == 200 and r.json():
+                return r.json()
+    except Exception:  # noqa: BLE001
+        pass
+    # Fallback: config.json connected providers
+    return get_all_enabled_models()
 
 
 @router.get("/models/default")
 async def get_default_model() -> dict:
-    """Return the best available provider + model for new sessions.
-
-    Priority: first non-mock provider with at least one model.
-    Fallback: mock / mock-1.
+    """Return the best available provider + model.
+    Tries pi-bridge first, then falls back to first connected config.json provider.
     """
-    for provider in container.model_router.providers.values():
-        if provider.provider_name == "mock":
-            continue
-        models = provider.list_models()
-        if models:
-            return {"provider": provider.provider_name, "model": models[0].id}
-
-    return {"provider": "mock", "model": "mock-1"}
+    from app.config.providers import get_all_enabled_models
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            r = await client.get(f"{BRIDGE}/models/default")
+            if r.status_code == 200:
+                return r.json()
+    except Exception:  # noqa: BLE001
+        pass
+    # Fallback: first model from config.json
+    models = get_all_enabled_models()
+    if models:
+        return {"provider": models[0]["provider"], "model": models[0]["id"]}
+    return {"provider": "pi", "model": "claude-sonnet-4-5"}

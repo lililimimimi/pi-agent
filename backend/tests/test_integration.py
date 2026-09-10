@@ -43,35 +43,26 @@ async def client():
 
 @pytest.mark.asyncio
 async def test_models_default_returns_mock_when_no_real_providers(client: AsyncClient):
-    """With only MockProvider registered, /api/models/default returns mock."""
-    r = await client.get("/api/models/default")
+    """When bridge is down and no config providers, returns built-in default."""
+    with patch("app.api.models.BRIDGE", "http://127.0.0.1:19999"), \
+         patch("app.config.providers.get_all_enabled_models", return_value=[]):
+        r = await client.get("/api/models/default")
     assert r.status_code == 200
     body = r.json()
-    assert body["provider"] == "mock"
-    assert body["model"] == "mock-1"
+    assert body["provider"] == "pi"
+    assert body["model"] == "claude-sonnet-4-5"
 
 
 @pytest.mark.asyncio
 async def test_models_default_prefers_non_mock(client: AsyncClient):
-    """When a non-mock provider is registered, it takes priority."""
-
-    class FakeProvider(ModelProvider):
-        provider_name = "fake-cloud"
-
-        def list_models(self) -> list[ModelInfo]:
-            return [ModelInfo(id="fake-v1", name="Fake V1", provider="fake-cloud")]
-
-        async def chat_stream(
-            self, model_id: str, messages: list[Message], tools: list[dict[str, Any]],
-        ) -> AsyncIterator[TextChunk]:
-            yield TextChunk(content="hi")
-
-    router = ModelRouter()
-    router.register(MockProvider())
-    router.register(FakeProvider())
-    container.model_router = router
-
-    r = await client.get("/api/models/default")
+    """When bridge is down, first model from config providers is returned as default."""
+    fake_models = [
+        {"id": "fake-v1", "name": "Fake V1", "provider": "fake-cloud", "supports_tools": False},
+        {"id": "mock-1", "name": "Mock", "provider": "mock", "supports_tools": False},
+    ]
+    with patch("app.api.models.BRIDGE", "http://127.0.0.1:19999"), \
+         patch("app.config.providers.get_all_enabled_models", return_value=fake_models):
+        r = await client.get("/api/models/default")
     assert r.status_code == 200
     body = r.json()
     assert body["provider"] == "fake-cloud"

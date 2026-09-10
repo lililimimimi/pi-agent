@@ -18,6 +18,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.types import Message, Role
+from app.sessions import store as session_store
+from app.sessions.models import MessageRecord
 
 BRIDGE_URL = os.getenv("PI_BRIDGE_URL", "http://localhost:3100")
 
@@ -25,10 +27,19 @@ router = APIRouter(prefix="/api")
 
 
 class _Session:
-    def __init__(self, messages: list[Message], provider: str, model: str) -> None:
+    def __init__(
+        self,
+        messages: list[Message],
+        provider: str,
+        model: str,
+        persist_id: str = "",
+        execution_preview: bool = True,
+    ) -> None:
         self.messages = messages
         self.provider = provider
         self.model = model
+        self.persist_id = persist_id
+        self.execution_preview = execution_preview
         self.approval_events: dict[str, asyncio.Event] = {}
         self.approval_results: dict[str, bool] = {}
 
@@ -43,12 +54,6 @@ def _get_session(session_id: str) -> _Session:
     return session
 
 
-class ChatRequest(BaseModel):
-    messages: list[dict[str, Any]]
-    provider: str = "mock"
-    model: str = "mock-1"
-
-
 class ApproveRequest(BaseModel):
     session_id: str
     tool_call_id: str
@@ -60,6 +65,14 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+class ChatRequest(BaseModel):
+    messages: list[dict[str, Any]]
+    provider: str = "mock"
+    model: str = "mock-1"
+    persist_id: str = ""
+    execution_preview: bool = True
+
+
 @router.post("/chat")
 async def create_chat(req: ChatRequest) -> dict[str, str]:
     messages = [
@@ -67,8 +80,28 @@ async def create_chat(req: ChatRequest) -> dict[str, str]:
         for msg in req.messages
     ]
     session_id = str(uuid.uuid4())
-    _sessions[session_id] = _Session(messages=messages, provider=req.provider, model=req.model)
-    return {"session_id": session_id}
+    persist_id = req.persist_id
+
+    if not persist_id:
+        first_content = next((m.content for m in messages if m.role == Role.USER), "")
+        title = first_content[:20].strip() if first_content else ""
+        meta = session_store.create_session(title=title)
+        persist_id = meta.id
+
+    for m in messages:
+        try:
+            session_store.append_record(persist_id, MessageRecord(role=m.role.value, content=m.content))
+        except FileNotFoundError:
+            pass
+
+    _sessions[session_id] = _Session(
+        messages=messages,
+        provider=req.provider,
+        model=req.model,
+        persist_id=persist_id,
+        execution_preview=req.execution_preview,
+    )
+    return {"session_id": session_id, "persist_id": persist_id}
 
 
 @router.get("/chat/stream/{session_id}")
@@ -76,6 +109,8 @@ async def stream_chat(session_id: str) -> StreamingResponse:
     session = _get_session(session_id)
 
     async def _proxy() -> AsyncIterator[str]:
+        import json as _json
+        assistant_text_parts: list[str] = []
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream(
                 "POST",
@@ -87,11 +122,28 @@ async def stream_chat(session_id: str) -> StreamingResponse:
                     ],
                     "provider": session.provider,
                     "model": session.model,
+                    "execution_preview": session.execution_preview,
                 },
             ) as resp:
                 async for line in resp.aiter_lines():
                     if line.startswith("data: "):
                         yield f"{line}\n\n"
+                        try:
+                            evt = _json.loads(line[6:])
+                            if evt.get("event") == "text":
+                                assistant_text_parts.append(evt["data"]["content"])
+                        except (ValueError, KeyError):
+                            pass
+
+        if session.persist_id and assistant_text_parts:
+            full_text = "".join(assistant_text_parts)
+            try:
+                session_store.append_record(
+                    session.persist_id,
+                    MessageRecord(role="assistant", content=full_text),
+                )
+            except FileNotFoundError:
+                pass
 
     return StreamingResponse(
         _proxy(),

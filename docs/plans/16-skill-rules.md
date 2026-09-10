@@ -1,4 +1,4 @@
-# 模块 13：Skill 规范文件管理
+# 模块 16：Skill 规范文件管理
 
 **目标：** 全局 + 项目级规范自动加载，注入 Agent system prompt。
 

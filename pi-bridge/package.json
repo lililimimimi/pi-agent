@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx watch server.ts",
     "build": "tsc",
-    "test": "node --import tsx --test server.test.ts",
+    "test": "node --import tsx --test server.test.ts src/preview.test.ts",
     "start": "node dist/server.js"
   },
   "dependencies": {

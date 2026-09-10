@@ -64,6 +64,20 @@ container.tool_registry.register(GitTool())
 from app.security import SecurityInterceptor  # noqa: E402
 container.security_interceptor = SecurityInterceptor(project_root=os.getcwd())
 
+# Sync Pi CLI OAuth + env-var API keys → config.json
+from app.config.providers import sync_env_vars_to_config, sync_pi_oauth_to_config  # noqa: E402
+sync_pi_oauth_to_config()   # Pi CLI OAuth (Claude.ai 订阅)
+sync_env_vars_to_config()   # env vars (ANTHROPIC_API_KEY 等)
+
+# Register Pi OAuth Claude provider if available
+from app.config.pi_oauth import is_available as pi_oauth_available  # noqa: E402
+if pi_oauth_available():
+    try:
+        from app.models.claude_oauth import ClaudeOAuthProvider
+        container.model_router.register(ClaudeOAuthProvider())
+    except Exception:  # noqa: BLE001
+        pass
+
 # --------------------------------------------------------------------------- #
 # FastAPI app
 # --------------------------------------------------------------------------- #
@@ -88,6 +102,16 @@ app.add_middleware(
 
 from app.api.chat import router as chat_router  # noqa: E402
 from app.api.models import router as models_router  # noqa: E402
+from app.api.sessions import router as sessions_router  # noqa: E402
+from app.api.projects import router as projects_router  # noqa: E402
+from app.api.filesystem import router as filesystem_router  # noqa: E402
+from app.api.providers import router as providers_router  # noqa: E402
+from app.api.preview import router as preview_router  # noqa: E402
 
 app.include_router(chat_router)
 app.include_router(models_router)
+app.include_router(sessions_router)
+app.include_router(projects_router)
+app.include_router(filesystem_router)
+app.include_router(providers_router)
+app.include_router(preview_router)

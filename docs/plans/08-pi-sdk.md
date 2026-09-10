@@ -1,4 +1,4 @@
-# 模块 15：Pi SDK 集成
+# 模块 8：Pi SDK 集成
 
 **目标：** 用 Pi SDK 替换自研 Agent 循环，通过 Node.js Bridge 服务对接，前端 API 契约不变。
 

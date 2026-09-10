@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as dotenv from "dotenv";
@@ -9,18 +10,36 @@ const envPath = resolve(fileURLToPath(import.meta.url), "../../backend/.env");
 dotenv.config({ path: envPath });
 import {
   createAgentSession,
+  DefaultResourceLoader,
+  getAgentDir,
   ModelRuntime,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import { buildPreview, isWriteTool, PreviewRegistry } from "./src/preview.js";
+
+// Pi CLI does this at startup: forces HTTP/1.1 (allowH2: false).
+// Without it, Node.js uses HTTP/2 which Anthropic rejects for OAuth tokens → 403.
+import { configureHttpDispatcher } from
+  "./node_modules/@earendil-works/pi-coding-agent/dist/core/http-dispatcher.js";
+configureHttpDispatcher();
+console.log("[bridge] HTTP dispatcher configured (HTTP/1.1 enforced, no H2)");
+import type { AgentSession, AgentSessionEvent, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const PORT = parseInt(process.env.PI_BRIDGE_PORT || "3100", 10);
+
+
 
 // Provider → env var mapping for API keys
 const PROVIDER_KEY_ENV: Record<string, string> = {
   deepseek: "DEEPSEEK_API_KEY",
   openai: "OPENAI_API_KEY",
   anthropic: "ANTHROPIC_API_KEY",
+}
+
+// "pi" is our OAuth-subscription alias for the "anthropic" provider
+// These map to the same ModelRuntime provider but skip API key injection
+const PROVIDER_ALIAS: Record<string, string> = {
+  pi: "anthropic",
 };
 
 // Model ID overrides: when frontend sends non-Pi-SDK model IDs
@@ -53,12 +72,64 @@ async function getModelRuntime(provider: string): Promise<ModelRuntime> {
 
 const sessions = new Map<string, AgentSession>();
 
-const app = express();
+export const previewRegistry = new PreviewRegistry();
+
+type PreviewController = {
+  enabled: boolean;
+  confirmed: boolean;
+  cancelled: boolean;
+  assistantText: string;
+  send: (event: string, data: Record<string, unknown>) => void;
+};
+
+/**
+ * Inline extension that pauses the agent before its first write tool call and
+ * waits for the user to confirm or cancel the execution preview. Read-only
+ * tools bypass the gate entirely.
+ */
+function makePreviewExtension(ctrl: PreviewController) {
+  return (pi: ExtensionAPI) => {
+    pi.on("tool_call", async (event) => {
+      if (!ctrl.enabled || ctrl.confirmed || ctrl.cancelled) return;
+      if (!isWriteTool(event.toolName)) return;
+
+      const previewId = crypto.randomUUID();
+      const steps = buildPreview({
+        assistantText: ctrl.assistantText,
+        toolName: event.toolName,
+        args: event.input as Record<string, unknown>,
+      });
+      ctrl.send("execution_preview", { preview_id: previewId, steps, has_write_ops: true });
+
+      const decision = await previewRegistry.wait(previewId, {
+        onTimeout: () => {
+          ctrl.send("text", { content: "\n\n> ⏱ 执行预览超时，已自动取消。\n" });
+        },
+      });
+
+      if (decision === "confirm") {
+        ctrl.confirmed = true;
+        return;
+      }
+
+      ctrl.cancelled = true;
+      if (decision === "cancel") {
+        ctrl.send("text", { content: "\n\n> ⏹ 已取消执行。\n" });
+      }
+      return { block: true, reason: "Execution cancelled at preview", terminate: true };
+    });
+  };
+}
+
+export const app = express();
 app.use(express.json());
 
 app.post("/chat", async (req, res) => {
   console.log(`[bridge] POST /chat body:`, JSON.stringify(req.body)?.slice(0, 200));
-  const { messages, provider = "anthropic", model: rawModel } = req.body;
+  const { messages, model: rawModel } = req.body;
+  // Resolve provider alias (e.g. "pi" → "anthropic")
+  const rawProvider: string = req.body.provider ?? "anthropic";
+  const provider = PROVIDER_ALIAS[rawProvider] ?? rawProvider;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -69,6 +140,14 @@ app.post("/chat", async (req, res) => {
   function send(event: string, data: Record<string, unknown>) {
     res.write(`data: ${JSON.stringify({ event, data })}\n\n`);
   }
+
+  const previewCtrl: PreviewController = {
+    enabled: req.body.execution_preview !== false,
+    confirmed: false,
+    cancelled: false,
+    assistantText: "",
+    send,
+  };
 
   let runtime: ModelRuntime;
   try {
@@ -85,10 +164,13 @@ app.post("/chat", async (req, res) => {
   // Resolve model: alias first, then look up in runtime, then fallback to provider default
   const modelId = MODEL_ALIASES[rawModel] ?? rawModel;
   let model = runtime.getModel(provider, modelId);
-  if (!model && PROVIDER_DEFAULT_MODEL[provider]) {
-    const fallbackId = PROVIDER_DEFAULT_MODEL[provider];
-    model = runtime.getModel(provider, fallbackId);
-    console.log(`[bridge] model ${modelId} not found, fallback to ${fallbackId} found=${!!model}`);
+  if (!model) {
+    // Try to find any working model for this provider
+    const fallbackId = PROVIDER_DEFAULT_MODEL[provider] ?? PROVIDER_DEFAULT_MODEL[rawProvider];
+    if (fallbackId) {
+      model = runtime.getModel(provider, fallbackId);
+      console.log(`[bridge] model ${modelId} not found, fallback to ${fallbackId} found=${!!model}`);
+    }
   } else {
     console.log(`[bridge] model resolved: ${provider}/${modelId} found=${!!model}`);
   }
@@ -96,11 +178,21 @@ app.post("/chat", async (req, res) => {
   let session: AgentSession;
   try {
     console.log(`[bridge] createAgentSession...`);
+    let resourceLoader: DefaultResourceLoader | undefined;
+    if (previewCtrl.enabled) {
+      resourceLoader = new DefaultResourceLoader({
+        cwd: process.cwd(),
+        agentDir: getAgentDir(),
+        extensionFactories: [makePreviewExtension(previewCtrl)],
+      });
+      await resourceLoader.reload();
+    }
     const result = await createAgentSession({
       sessionManager: SessionManager.inMemory(),
       modelRuntime: runtime,
       tools: ["read", "bash", "edit", "write"],
       ...(model ? { model } : {}),
+      ...(resourceLoader ? { resourceLoader } : {}),
     });
     session = result.session;
   } catch (err: unknown) {
@@ -124,9 +216,14 @@ app.post("/chat", async (req, res) => {
 
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
     switch (event.type) {
+      case "turn_start":
+        // Reset the plan buffer so each turn's steps are independent.
+        previewCtrl.assistantText = "";
+        break;
       case "message_update": {
         const ame = event.assistantMessageEvent;
         if (ame.type === "text_delta") {
+          previewCtrl.assistantText += ame.delta;
           send("text", { content: ame.delta });
         }
         break;
@@ -193,11 +290,115 @@ app.post("/approve", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+app.post("/preview/:id/confirm", (req, res) => {
+  const ok = previewRegistry.resolve(req.params.id, "confirm");
+  if (!ok) return res.status(404).json({ error: "Preview not found" });
+  res.json({ status: "ok" });
+});
+
+app.post("/preview/:id/cancel", (req, res) => {
+  const ok = previewRegistry.resolve(req.params.id, "cancel");
+  if (!ok) return res.status(404).json({ error: "Preview not found" });
+  res.json({ status: "ok" });
+});
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.listen(PORT, () => console.log(`pi-bridge listening on port ${PORT}`));
+// ── Models endpoints ─────────────────────────────────────────────────────────
 
-// Keep process alive (Pi SDK imports may otherwise drain the event loop)
-setInterval(() => {}, 1 << 30);
+async function ensureRuntime(): Promise<ModelRuntime> {
+  if (!modelRuntimeInstance) {
+    modelRuntimeInstance = await ModelRuntime.create();
+  }
+  // Inject all available API keys
+  for (const [provider, envVar] of Object.entries(PROVIDER_KEY_ENV)) {
+    if (process.env[envVar]) {
+      await modelRuntimeInstance.setRuntimeApiKey(provider, process.env[envVar]!);
+    }
+  }
+  return modelRuntimeInstance;
+}
+
+app.get("/models", async (_req, res) => {
+  try {
+    const runtime = await ensureRuntime();
+    const available = await runtime.getAvailable();
+    const models = available.map((m) => ({
+      id: m.id,
+      name: m.name,
+      provider: m.provider,
+      supports_tools: true,
+    }));
+    res.json(models);
+  } catch (err) {
+    console.error("[bridge] /models error:", err);
+    res.json([]);
+  }
+});
+
+app.get("/models/default", async (_req, res) => {
+  try {
+    const runtime = await ensureRuntime();
+    const available = await runtime.getAvailable();
+    // Prefer non-mock provider
+    const preferred = available.find((m) => m.provider !== "mock") ?? available[0];
+    if (preferred) {
+      res.json({ provider: preferred.provider, model: preferred.id });
+    } else {
+      res.json({ provider: "mock", model: "mock-1" });
+    }
+  } catch {
+    res.json({ provider: "mock", model: "mock-1" });
+  }
+});
+
+// ── API Key Management ─────────────────────────────────────────────
+
+app.post("/api-keys", async (req, res) => {
+  try {
+    const { provider, apiKey } = req.body as { provider: string; apiKey: string };
+    const runtime = await ensureRuntime();
+    await runtime.setRuntimeApiKey(provider, apiKey);
+    res.json({ status: "ok" });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message ?? String(err) });
+  }
+});
+
+app.get("/api-keys/status", async (_req, res) => {
+  try {
+    const runtime = await ensureRuntime();
+    const result = Object.keys(PROVIDER_KEY_ENV).map((provider) => ({
+      provider,
+      configured: runtime.hasConfiguredAuth(provider),
+    }));
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message ?? String(err) });
+  }
+});
+
+app.delete("/api-keys/:provider", async (req, res) => {
+  try {
+    const runtime = await ensureRuntime();
+    await runtime.removeRuntimeApiKey(req.params.provider);
+    res.json({ status: "ok" });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message ?? String(err) });
+  }
+});
+
+// Only start listening / keep-alive when this file is run directly
+// (not when imported by tests).
+const isMain =
+  process.argv[1] !== undefined &&
+  realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+
+if (isMain) {
+  app.listen(PORT, () => console.log(`pi-bridge listening on port ${PORT}`));
+
+  // Keep process alive (Pi SDK imports may otherwise drain the event loop)
+  setInterval(() => {}, 1 << 30);
+}

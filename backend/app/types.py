@@ -60,3 +60,10 @@ class PermissionRequestEvent(BaseModel):
     """SSE event emitted when a dangerous tool needs user approval."""
     event: str = Field(default="permission_request", frozen=True)
     data: dict[str, Any]  # tool_call_id, tool_name, arguments
+
+
+class ExecutionPreviewEvent(BaseModel):
+    """SSE event emitted before the first write tool call, so the user can
+    confirm the agent's intended steps before anything is modified."""
+    event: str = Field(default="execution_preview", frozen=True)
+    data: dict[str, Any]  # preview_id, steps, has_write_ops

@@ -1,9 +1,150 @@
+import { useState, useCallback, useRef, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
+import { Copy, Check, ChevronRight } from 'lucide-react'
 import { ToolCallCard } from '@/components/ToolCallCard'
-import type { Message } from '@/types'
+import type { Message, ToolCall, ToolResult } from '@/types'
 import { cn } from '@/lib/utils'
+
+function extractText(node: ReactNode): string {
+  if (typeof node === 'string') return node
+  if (typeof node === 'number') return String(node)
+  if (!node) return ''
+  if (Array.isArray(node)) return node.map(extractText).join('')
+  if (typeof node === 'object' && 'props' in node) {
+    return extractText((node as React.ReactElement<{ children?: ReactNode }>).props.children)
+  }
+  return ''
+}
+
+/** 从 <code className="language-xxx"> 提取语言名 */
+function extractLang(node: ReactNode): string {
+  if (!node || typeof node !== 'object' || !('props' in node)) return ''
+  const cls = (node as React.ReactElement<{ className?: string }>).props.className ?? ''
+  const m = cls.match(/language-(\w+)/)
+  return m ? m[1] : ''
+}
+
+function CodeBlock({ children }: { children: ReactNode }) {
+  const [copied, setCopied] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const lang = extractLang(children)
+
+  const handleCopy = useCallback(() => {
+    const text = extractText(children)
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), 1500)
+    })
+  }, [children])
+
+  return (
+    <div className="group/code relative my-2 rounded-xl overflow-hidden">
+      {/* Language label bar */}
+      {lang && (
+        <div className="flex items-center justify-between bg-zinc-800 px-4 py-1.5">
+          <span className="text-[11px] font-mono text-zinc-400">{lang}</span>
+        </div>
+      )}
+      <pre className={cn(
+        'px-4 py-3.5 overflow-x-auto text-[13px] leading-relaxed',
+        lang ? 'bg-zinc-950' : 'bg-foreground/[0.05]',
+      )}>
+        {children}
+      </pre>
+      <button
+        type="button"
+        onClick={handleCopy}
+        className={cn(
+          'absolute right-2.5 flex h-6 w-6 items-center justify-center rounded-lg',
+          lang ? 'top-9' : 'top-2.5',
+          lang ? 'text-zinc-500 hover:bg-white/10 hover:text-zinc-300' : 'text-muted-foreground/50 hover:bg-foreground/[0.06] hover:text-foreground/70',
+          'transition-all duration-200',
+          'opacity-0 group-hover/code:opacity-100',
+          'cursor-pointer',
+          copied && (lang ? 'opacity-100 text-green-400 hover:text-green-400' : 'opacity-100 text-green-600 hover:text-green-600'),
+        )}
+        aria-label={copied ? 'Copied' : 'Copy code'}
+      >
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  )
+}
+
+// ── List block with copy button ─────────────────────────────────────────
+function ListBlock({ children }: { children: ReactNode }) {
+  const [copied, setCopied] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  const handleCopy = useCallback(() => {
+    const text = extractText(children)
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), 1500)
+    })
+  }, [children])
+
+  return (
+    <div className="group/list relative rounded-xl border border-border bg-white/60 px-4 py-3 my-1">
+      <button
+        type="button"
+        onClick={handleCopy}
+        className={cn(
+          'absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-lg',
+          'text-muted-foreground/50 transition-all duration-200',
+          'opacity-0 group-hover/list:opacity-100',
+          'hover:bg-foreground/[0.06] hover:text-foreground/70',
+          'cursor-pointer',
+          copied && 'opacity-100 text-green-600 hover:text-green-600',
+        )}
+        aria-label={copied ? 'Copied' : 'Copy'}
+      >
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+      <ul className="space-y-1.5 list-none m-0 p-0">{children}</ul>
+    </div>
+  )
+}
+
+// ── Tool call collapsible group ─────────────────────────────────────────────
+function ToolCallGroup({ toolCalls, toolResults }: { toolCalls: ToolCall[]; toolResults?: ToolResult[] }) {
+  const [open, setOpen] = useState(false)
+  const doneCount = toolCalls.filter((tc) =>
+    toolResults?.some((tr) => tr.toolCallId === tc.toolCallId)
+  ).length
+  const total = toolCalls.length
+  const allDone = doneCount === total
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-foreground/80 transition-colors cursor-pointer select-none"
+      >
+        <ChevronRight
+          className={cn('h-3 w-3 transition-transform duration-150', open && 'rotate-90')}
+        />
+        <span>
+          {total} tool call{total > 1 ? 's' : ''}
+          {allDone ? '' : ` · ${doneCount}/${total}`}
+        </span>
+      </button>
+      {open && (
+        <div className="mt-1.5 space-y-1">
+          {toolCalls.map((tc) => {
+            const result = toolResults?.find((tr) => tr.toolCallId === tc.toolCallId)
+            return <ToolCallCard key={tc.toolCallId} toolCall={tc} result={result} />
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 type MessageBubbleProps = {
   message: Message
@@ -31,12 +172,8 @@ const assistantComponents: Components = {
     </div>
   ),
 
-  // Lists: bordered rounded box
-  ul: ({ children }) => (
-    <div className="rounded-xl border border-border bg-white/60 px-4 py-3 my-1">
-      <ul className="space-y-1.5 list-none m-0 p-0">{children}</ul>
-    </div>
-  ),
+  // Lists: bordered rounded box with copy button
+  ul: ({ children }) => <ListBlock>{children}</ListBlock>,
   ol: ({ children }) => (
     <ol className="space-y-2.5 list-decimal pl-5 m-0">{children}</ol>
   ),
@@ -44,12 +181,8 @@ const assistantComponents: Components = {
     <li className="text-sm leading-[1.8] text-foreground/85">{children}</li>
   ),
 
-  // Code block: gray background (only for code)
-  pre: ({ children }) => (
-    <pre className="bg-foreground/[0.06] rounded-xl border border-foreground/8 px-4 py-3.5 overflow-x-auto text-[13px] leading-relaxed my-1">
-      {children}
-    </pre>
-  ),
+  // Code block: gray background with copy button
+  pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   code: ({ className, children, ...props }) => {
     // inline code
     const isBlock = !!(props as Record<string, unknown>).node
@@ -138,11 +271,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           )
         )}
 
-        {/* Tool calls */}
-        {message.toolCalls?.map((tc) => {
-          const result = message.toolResults?.find((tr) => tr.toolCallId === tc.toolCallId)
-          return <ToolCallCard key={tc.toolCallId} toolCall={tc} result={result} />
-        })}
+        {/* Tool calls — collapsible group */}
+        {message.toolCalls && message.toolCalls.length > 0 && (
+          <ToolCallGroup toolCalls={message.toolCalls} toolResults={message.toolResults} />
+        )}
       </div>
     </div>
   )

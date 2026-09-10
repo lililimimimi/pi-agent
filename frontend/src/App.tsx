@@ -1,12 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChatView } from '@/components/ChatView'
 import { InputBar } from '@/components/InputBar'
 import { ModelSelector } from '@/components/ModelSelector'
 import { TokenCounter } from '@/components/TokenCounter'
+import { ContextBar } from '@/components/ContextBar'
 import { Sidebar } from '@/components/Sidebar'
 import { SettingsModal } from '@/components/SettingsModal'
+import { ApprovalModal } from '@/components/ApprovalModal'
+import { useToast } from '@/components/Toast'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { useChatStore } from '@/stores/chatStore'
 import { PanelLeft } from 'lucide-react'
+
+function ActiveApprovalModal() {
+  const permissionRequests = useChatStore((s) => s.permissionRequests)
+  // Find the first pending request
+  let activeRequest = undefined
+  for (const req of permissionRequests.values()) {
+    if (req.status === 'pending') { activeRequest = req; break }
+  }
+  if (!activeRequest) return null
+  return <ApprovalModal request={activeRequest} />
+}
 
 const PI_GRADIENT = {
   background: 'linear-gradient(135deg, #007AFF 0%, #AF52DE 50%, #FF2D55 100%)',
@@ -17,13 +33,42 @@ const PI_GRADIENT = {
 
 export function App() {
   const initProvider = useChatStore((s) => s.initProvider)
+  const loadPersistedSessions = useChatStore((s) => s.loadPersistedSessions)
+  const loadPersistedProjects = useChatStore((s) => s.loadPersistedProjects)
   const messages = useChatStore((s) => s.messages)
+  const newSession = useChatStore((s) => s.newSession)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const isEmpty = messages.length === 0
 
-  useEffect(() => { initProvider() }, [initProvider])
+  // ── Toast + Network status ──
+  const { showToast } = useToast()
+  const networkCallbacks = useMemo(() => ({
+    onOffline: () => showToast({ type: 'error', message: '网络连接已断开，请检查网络', duration: 0 }),
+    onOnline: () => showToast({ type: 'success', message: '网络连接已恢复' }),
+  }), [showToast])
+  useNetworkStatus(networkCallbacks)
+
+  // ── Keyboard shortcuts ──
+  const shortcutHandlers = useMemo(() => ({
+    onNewChat: newSession,
+    onOpenSettings: () => setSettingsOpen(true),
+    onFocusInput: () => {
+      const textarea = document.querySelector<HTMLTextAreaElement>('textarea[placeholder="Message pi…"]')
+      textarea?.focus()
+    },
+  }), [newSession])
+  useKeyboardShortcuts(shortcutHandlers)
+
+  useEffect(() => {
+    // 先加载 projects（包含 path），再加载 sessions（需要 path 匹配）
+    const init = async () => {
+      await Promise.all([initProvider(), loadPersistedProjects()])
+      await loadPersistedSessions()
+    }
+    init()
+  }, [initProvider, loadPersistedSessions, loadPersistedProjects])
 
   // ⌘B — toggle sidebar
   useEffect(() => {
@@ -52,6 +97,7 @@ export function App() {
             <PanelLeft className="h-4 w-4" strokeWidth={1.8} />
           </button>
           <div className="flex-1" />
+          <ContextBar />
           <TokenCounter />
           <ModelSelector />
         </header>
@@ -80,6 +126,7 @@ export function App() {
           <>
             <ChatView />
             <InputBar />
+            <ActiveApprovalModal />
           </>
         )}
       </div>

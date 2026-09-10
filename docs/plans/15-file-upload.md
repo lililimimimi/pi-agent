@@ -1,6 +1,6 @@
-# 模块 8：图片上传（多模态）
+# 模块 15：文件上传（多模态）
 
-**目标：** 用户可附加图片发送，Claude Vision 解析后回复。
+**目标：** 用户可附加图片或文本文件发送，agent 读取内容后分析回复。
 
 ## 文件
 - `backend/app/types.py` — ImageContent, MessageContent（扩展 Message.content）

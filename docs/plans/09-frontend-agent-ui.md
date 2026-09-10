@@ -1,4 +1,4 @@
-# 模块 16：前端 Agent 执行界面
+# 模块 9：前端 Agent 执行界面
 
 **依赖：** 15-pi-sdk.md（backend 需先支持 `permission_request` 事件）
 
