@@ -5,8 +5,12 @@ const BASE = '/api'
 /**
  * Create a chat session, returns { session_id, persist_id }.
  */
+export type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; image: { media_type: string; data: string } }
+
 export async function createChat(
-  messages: { role: string; content: string }[],
+  messages: { role: string; content: string | ContentPart[] }[],
   provider = 'mock',
   model = 'mock-1',
   persistId?: string,
