@@ -6,7 +6,7 @@ vi.mock('@/services/api', () => ({
 }))
 
 import { fetchFileTree, fetchFileContent } from '@/services/api'
-import { useFileBrowserStore } from '../fileBrowserStore'
+import { useFileBrowserStore, clampPreviewWidth, PREVIEW_MIN_WIDTH } from '../fileBrowserStore'
 
 const treeOf = (children: unknown[]) => ({ name: 'root', type: 'dir', path: '', children })
 
@@ -70,5 +70,60 @@ describe('fileBrowserStore', () => {
 
     expect(useFileBrowserStore.getState().error).toBe('Binary files are not supported')
     expect(useFileBrowserStore.getState().pendingFile).toBeNull()
+  })
+})
+
+describe('file preview pane', () => {
+  beforeEach(() => {
+    useFileBrowserStore.setState({ preview: null })
+  })
+
+  it('openFile fills both the preview and the pending attachment', async () => {
+    useFileBrowserStore.setState({ rootPath: '/proj' })
+    vi.mocked(fetchFileContent).mockResolvedValue({ path: 'src/App.tsx', content: 'line1\nline2', size: 11 })
+
+    await useFileBrowserStore.getState().openFile('src/App.tsx')
+
+    const state = useFileBrowserStore.getState()
+    expect(state.preview).toEqual({ path: 'src/App.tsx', content: 'line1\nline2' })
+    expect(state.pendingFile).toEqual({ path: 'src/App.tsx', content: 'line1\nline2' })
+  })
+
+  it('closePreview hides the pane but keeps the pending attachment', async () => {
+    useFileBrowserStore.setState({ rootPath: '/proj' })
+    vi.mocked(fetchFileContent).mockResolvedValue({ path: 'a.ts', content: 'x', size: 1 })
+    await useFileBrowserStore.getState().openFile('a.ts')
+
+    useFileBrowserStore.getState().closePreview()
+
+    expect(useFileBrowserStore.getState().preview).toBeNull()
+    expect(useFileBrowserStore.getState().pendingFile).not.toBeNull()
+  })
+
+  it('changing the root clears the preview', () => {
+    useFileBrowserStore.setState({ rootPath: '/proj', preview: { path: 'a.ts', content: 'x' } })
+
+    useFileBrowserStore.getState().setRootPath('/other')
+
+    expect(useFileBrowserStore.getState().preview).toBeNull()
+  })
+})
+
+describe('clampPreviewWidth', () => {
+  it('keeps the preview at least the minimum width', () => {
+    expect(clampPreviewWidth(50, 1400)).toBe(PREVIEW_MIN_WIDTH)
+  })
+
+  it('leaves room for the chat column on narrow windows', () => {
+    // 1000px window: 1000 - 208 - 320 = 472 is the most the pane may take
+    expect(clampPreviewWidth(900, 1000)).toBe(472)
+  })
+
+  it('caps very wide panes', () => {
+    expect(clampPreviewWidth(2000, 4000)).toBe(900)
+  })
+
+  it('passes a reasonable width through unchanged', () => {
+    expect(clampPreviewWidth(500, 1400)).toBe(500)
   })
 })

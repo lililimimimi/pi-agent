@@ -5,6 +5,7 @@ import { ModelSelector } from '@/components/ModelSelector'
 import { TokenCounter } from '@/components/TokenCounter'
 import { ContextBar } from '@/components/ContextBar'
 import { Sidebar } from '@/components/Sidebar'
+import { FilePreview } from '@/components/FilePreview'
 import { SettingsModal } from '@/components/SettingsModal'
 import { ApprovalModal } from '@/components/ApprovalModal'
 import { useToast } from '@/components/Toast'
@@ -86,6 +87,7 @@ export function App() {
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
       {sidebarOpen && <Sidebar onSettingsClick={() => setSettingsOpen(true)} />}
 
+      <div className="flex flex-1 min-w-0 overflow-hidden">
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Header */}
         <header className="flex items-center gap-3 px-4 h-[61px] bg-background/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-30">
@@ -129,6 +131,9 @@ export function App() {
             <ActiveApprovalModal />
           </>
         )}
+      </div>
+
+      <FilePreview />
       </div>
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
