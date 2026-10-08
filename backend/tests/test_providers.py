@@ -187,7 +187,7 @@ def test_list_providers_returns_all(client: TestClient):
     resp = client.get("/api/providers")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 7   # pi + anthropic + deepseek + openai + gemini + siliconflow + ollama
+    assert len(data) == 8   # pi + anthropic + deepseek + openai + openai-codex + gemini + siliconflow + ollama
     ids = {p["id"] for p in data}
     assert "pi" in ids
     assert "anthropic" in ids

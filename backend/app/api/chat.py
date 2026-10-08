@@ -30,6 +30,9 @@ from app.types import (
 from app.sessions import store as session_store
 from app.sessions.models import MessageRecord
 from app.rules.engine import RulesEngine
+from app.logging import get_logger, get_correlation_id, new_correlation_id, set_correlation_id
+
+log = get_logger(__name__)
 
 BRIDGE_URL = os.getenv("PI_BRIDGE_URL", "http://localhost:3100")
 
@@ -46,6 +49,7 @@ class _Session:
         execution_preview: bool = True,
         rules: str = "",
         project_path: str = "",
+        cid: str = "",
     ) -> None:
         self.messages = messages
         self.provider = provider
@@ -54,6 +58,8 @@ class _Session:
         self.execution_preview = execution_preview
         self.rules = rules
         self.project_path = project_path
+        # Same correlation ID as the create request, so the whole chat can be followed
+        self.cid = cid or get_correlation_id()
         self.approval_events: dict[str, asyncio.Event] = {}
         self.approval_results: dict[str, bool] = {}
 
@@ -133,6 +139,7 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 async def create_chat(req: ChatRequest) -> dict[str, str]:
+    set_correlation_id(new_correlation_id())
     messages = [
         Message(role=Role(msg.get("role", "user")), content=_parse_content(msg.get("content", "")))
         for msg in req.messages
@@ -152,7 +159,7 @@ async def create_chat(req: ChatRequest) -> dict[str, str]:
         record_text = text_of(m.content)
         n_images = len(images_of(m.content))
         if n_images:
-            record_text = f"{record_text}\n[附图 {n_images} 张]".strip()
+            record_text = f"{record_text}\n[{n_images} image(s) attached]".strip()
         try:
             session_store.append_record(persist_id, MessageRecord(role=m.role.value, content=record_text))
         except FileNotFoundError:
@@ -161,7 +168,7 @@ async def create_chat(req: ChatRequest) -> dict[str, str]:
     try:
         rules = RulesEngine().build_rules(req.project_path)
     except OSError as exc:  # rules are optional; never block the chat on them
-        print(f"[chat] could not build rules: {exc}")
+        log.warning("could not build project rules: {}", exc)
         rules = ""
 
     _sessions[session_id] = _Session(
@@ -172,6 +179,11 @@ async def create_chat(req: ChatRequest) -> dict[str, str]:
         execution_preview=req.execution_preview,
         rules=rules,
         project_path=req.project_path,
+        cid=get_correlation_id(),
+    )
+    log.info(
+        "chat created: provider={} model={} messages={} project={}",
+        req.provider, req.model, len(messages), req.project_path or "-",
     )
     return {"session_id": session_id, "persist_id": persist_id}
 
@@ -182,7 +194,11 @@ async def stream_chat(session_id: str) -> StreamingResponse:
 
     async def _proxy() -> AsyncIterator[str]:
         import json as _json
+        import time as _time
+        set_correlation_id(session.cid)
+        started = _time.monotonic()
         assistant_text_parts: list[str] = []
+        log.info("stream started: provider={} model={}", session.provider, session.model)
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream(
                 "POST",
@@ -197,12 +213,13 @@ async def stream_chat(session_id: str) -> StreamingResponse:
                     "execution_preview": session.execution_preview,
                     "rules": session.rules,
                     "cwd": session.project_path,
+                    "cid": session.cid,
                 },
             ) as resp:
                 if resp.status_code != 200:
                     # Without this the browser gets nothing and waits forever
                     detail = (await resp.aread()).decode(errors="replace")[:200]
-                    print(f"[chat] pi-bridge returned {resp.status_code}: {detail}")
+                    log.error("pi-bridge returned {}: {}", resp.status_code, detail)
                     message = f"pi-bridge returned HTTP {resp.status_code}"
                     yield f"data: {_json.dumps({'event': 'error', 'data': {'message': message}})}\n\n"
                     yield f"data: {_json.dumps({'event': 'done', 'data': {}})}\n\n"
@@ -217,6 +234,11 @@ async def stream_chat(session_id: str) -> StreamingResponse:
                         except (ValueError, KeyError):
                             pass
 
+        log.info(
+            "stream finished: {:.1f}s, reply_chars={}",
+            _time.monotonic() - started,
+            len("".join(assistant_text_parts)),
+        )
         if session.persist_id and assistant_text_parts:
             full_text = "".join(assistant_text_parts)
             try:

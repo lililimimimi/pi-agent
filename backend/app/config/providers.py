@@ -25,13 +25,14 @@ from typing import Any
 # Supported providers & defaults
 # ---------------------------------------------------------------------------
 
-PROVIDER_IDS = ("pi", "anthropic", "deepseek", "openai", "gemini", "siliconflow", "ollama")
+PROVIDER_IDS = ("pi", "anthropic", "deepseek", "openai", "openai-codex", "gemini", "siliconflow", "ollama")
 
 PROVIDER_META: dict[str, dict[str, Any]] = {
-    "pi":          {"label": "Claude.ai 订阅 (Pi)", "key_field": "none",    "placeholder": ""},
+    "pi":          {"label": "Claude.ai subscription (Pi)", "key_field": "none",    "placeholder": ""},
     "anthropic":   {"label": "Anthropic (Claude)", "key_field": "api_key",  "placeholder": "sk-ant-..."},
     "deepseek":    {"label": "DeepSeek",            "key_field": "api_key",  "placeholder": "sk-..."},
     "openai":      {"label": "OpenAI",              "key_field": "api_key",  "placeholder": "sk-..."},
+    "openai-codex": {"label": "OpenAI (ChatGPT subscription)", "key_field": "none", "placeholder": ""},
     "gemini":      {"label": "Google Gemini",       "key_field": "api_key",  "placeholder": "AIza..."},
     "siliconflow": {"label": "SiliconFlow",         "key_field": "api_key",  "placeholder": "sk-..."},
     "ollama":      {"label": "Ollama (local)",      "key_field": "base_url", "placeholder": "http://localhost:11434"},
@@ -106,6 +107,19 @@ def sync_pi_oauth_to_config() -> None:
         p["api_key"]   = ""
         p["note"]      = "Pi not logged in (run: pi /login)"
 
+    save_config(cfg)
+
+
+def sync_codex_login_to_config() -> None:
+    """Mark the OpenAI subscription as connected when Pi has a Codex login."""
+    from app.config.pi_oauth import is_logged_in
+    cfg = load_config()
+    p = cfg["providers"].setdefault("openai-codex", dict(_DEFAULT_PROVIDER))
+    connected = is_logged_in("openai-codex")
+    p["enabled"] = connected
+    p["connected"] = connected
+    p["api_key"] = "[oauth]" if connected else ""
+    p["note"] = "Pi OpenAI login" if connected else "Not logged in (run: pi /login, choose OpenAI)"
     save_config(cfg)
 
 
@@ -207,9 +221,23 @@ def update_provider_config(provider_id: str, updates: dict[str, Any]) -> None:
     cfg = load_config()
     current = cfg["providers"].setdefault(provider_id, dict(_DEFAULT_PROVIDER))
     for k, v in updates.items():
-        if k in ("api_key", "base_url", "enabled", "models", "connected"):
+        if k in ("api_key", "base_url", "enabled", "models", "connected", "enabled_models", "model_status"):
             current[k] = v
     save_config(cfg)
+
+
+CUSTOM_PREFIX = "custom-"
+
+
+def is_custom_provider(provider_id: str) -> bool:
+    return provider_id.startswith(CUSTOM_PREFIX)
+
+
+def known_provider(provider_id: str) -> bool:
+    """Built-in provider, or a custom one the user added."""
+    if provider_id in PROVIDER_IDS:
+        return True
+    return is_custom_provider(provider_id) and provider_id in load_config()["providers"]
 
 
 def all_providers_masked() -> list[dict[str, Any]]:
@@ -219,7 +247,7 @@ def all_providers_masked() -> list[dict[str, Any]]:
     for pid in PROVIDER_IDS:
         p = cfg["providers"].get(pid, {})
         meta = PROVIDER_META[pid]
-        is_pi = pid == "pi"
+        is_pi = pid in ("pi", "openai-codex")  # OAuth logins, managed by Pi
         result.append({
             "id":          pid,
             "label":       meta["label"],
@@ -233,6 +261,25 @@ def all_providers_masked() -> list[dict[str, Any]]:
             "configured":  p.get("connected", False) if is_pi else bool(p.get("api_key") or p.get("base_url")),
             "note":        p.get("note", ""),
             "readonly":    is_pi,  # frontend should not show key input for pi
+        })
+    # User-added providers, after the built-in ones
+    for pid, p in cfg["providers"].items():
+        if not is_custom_provider(pid):
+            continue
+        result.append({
+            "id":          pid,
+            "label":       p.get("name") or pid,
+            "key_field":   "api_key",
+            "placeholder": "API key",
+            "api_key":     mask_key(p.get("api_key", "")),
+            "base_url":    p.get("base_url", ""),
+            "enabled":     p.get("enabled", False),
+            "models":      p.get("models", []),
+            "connected":   p.get("connected", False),
+            "configured":  bool(p.get("api_key")),
+            "note":        p.get("note", ""),
+            "readonly":    False,
+            "custom":      True,
         })
     return result
 

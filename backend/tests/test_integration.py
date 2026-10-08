@@ -3,34 +3,10 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import AsyncClient, ASGITransport
-
-import app.container as container
-from app.models.base import MockProvider, ModelInfo, ModelProvider, ModelRouter
-from app.tools.base import ToolRegistry
-from app.types import Message, TextChunk, ToolCallChunk
-
-
-@pytest.fixture(autouse=True)
-def _patch_registries():
-    """Replace global registries with clean mock instances for every test."""
-    original_router = container.model_router
-    original_registry = container.tool_registry
-
-    router = ModelRouter()
-    router.register(MockProvider())
-    container.model_router = router
-    container.tool_registry = ToolRegistry()
-
-    yield
-
-    container.model_router = original_router
-    container.tool_registry = original_registry
-
 
 @pytest.fixture
 async def client():
@@ -45,7 +21,7 @@ async def client():
 async def test_models_default_returns_mock_when_no_real_providers(client: AsyncClient):
     """When bridge is down and no config providers, returns built-in default."""
     with patch("app.api.models.BRIDGE", "http://127.0.0.1:19999"), \
-         patch("app.config.providers.get_all_enabled_models", return_value=[]):
+         patch("app.api.models.list_models", AsyncMock(return_value=[])):
         r = await client.get("/api/models/default")
     assert r.status_code == 200
     body = r.json()
@@ -54,19 +30,13 @@ async def test_models_default_returns_mock_when_no_real_providers(client: AsyncC
 
 
 @pytest.mark.asyncio
-async def test_models_default_prefers_non_mock(client: AsyncClient):
-    """When bridge is down, first model from config providers is returned as default."""
-    fake_models = [
-        {"id": "fake-v1", "name": "Fake V1", "provider": "fake-cloud", "supports_tools": False},
-        {"id": "mock-1", "name": "Mock", "provider": "mock", "supports_tools": False},
-    ]
-    with patch("app.api.models.BRIDGE", "http://127.0.0.1:19999"), \
-         patch("app.config.providers.get_all_enabled_models", return_value=fake_models):
+async def test_models_default_prefers_first_enabled_model(client: AsyncClient):
+    """The default is the first model the user enabled in Settings."""
+    enabled = [{"id": "fake-v1", "name": "Fake V1", "provider": "fake-cloud", "supports_tools": True}]
+    with patch("app.api.models.list_models", AsyncMock(return_value=enabled)):
         r = await client.get("/api/models/default")
     assert r.status_code == 200
-    body = r.json()
-    assert body["provider"] == "fake-cloud"
-    assert body["model"] == "fake-v1"
+    assert r.json() == {"provider": "fake-cloud", "model": "fake-v1"}
 
 
 # --------------------------------------------------------------------------- #

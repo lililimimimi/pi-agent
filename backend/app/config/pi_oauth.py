@@ -34,6 +34,15 @@ def _read_raw() -> dict[str, Any]:
         return {}
 
 
+def is_logged_in(provider: str) -> bool:
+    """True if Pi has a non-expired OAuth login for this provider in auth.json."""
+    data = _read_raw().get(provider, {})
+    if not data.get("access"):
+        return False
+    expires_ms = data.get("expires", 0)
+    return not (expires_ms and time.time() * 1000 > expires_ms)
+
+
 def is_available() -> bool:
     """Return True if a valid (non-expired) Anthropic OAuth token exists."""
     data = _read_raw().get("anthropic", {})

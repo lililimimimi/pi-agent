@@ -17,6 +17,10 @@ from pydantic import BaseModel
 
 from app.config.providers import (
     PROVIDER_IDS,
+    CUSTOM_PREFIX,
+    known_provider,
+    load_config,
+    save_config,
     all_providers_masked,
     get_provider_config,
     update_provider_config,
@@ -34,6 +38,12 @@ class ProviderUpdate(BaseModel):
     enabled:  bool | None = None
 
 
+class CustomProviderCreate(BaseModel):
+    name: str
+    base_url: str
+    api_key: str
+
+
 class TestResult(BaseModel):
     ok:          bool
     latency_ms:  int
@@ -48,13 +58,102 @@ class TestResult(BaseModel):
 @router.get("")
 async def list_providers() -> list[dict[str, Any]]:
     """Return all provider configs with masked API keys."""
+    # Re-check Pi logins, so a login finished in Settings shows up right away
+    from app.config.providers import sync_codex_login_to_config, sync_pi_oauth_to_config
+    sync_pi_oauth_to_config()
+    sync_codex_login_to_config()
     return all_providers_masked()
+
+
+LOGIN_PROVIDERS = {"openai-codex", "pi"}
+
+
+@router.post("/{provider_id}/login")
+async def start_login(provider_id: str) -> dict[str, Any]:
+    """Start an in-app OAuth login (run by pi-bridge)."""
+    if provider_id not in LOGIN_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"{provider_id} does not support in-app login")
+    return await _bridge_call("POST", f"/auth/login", {"provider": provider_id})
+
+
+@router.post("/{provider_id}/logout")
+async def logout(provider_id: str) -> dict[str, Any]:
+    """Log out of an OAuth provider; Pi removes the stored login."""
+    if provider_id not in LOGIN_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"{provider_id} does not support in-app logout")
+    result = await _bridge_call("POST", "/auth/logout", {"provider": provider_id})
+    from app.config.providers import sync_codex_login_to_config, sync_pi_oauth_to_config
+    sync_pi_oauth_to_config()
+    sync_codex_login_to_config()
+    return result
+
+
+@router.get("/{provider_id}/login")
+async def login_status(provider_id: str) -> dict[str, Any]:
+    """Progress of the login: the events to show (such as the sign-in link)."""
+    return await _bridge_call("GET", f"/auth/login/{provider_id}")
+
+
+async def _bridge_call(method: str, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    import os
+    bridge = os.getenv("PI_BRIDGE_URL", "http://localhost:3100")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.request(method, f"{bridge}{path}", json=body)
+            return r.json()
+    except (httpx.HTTPError, ValueError) as e:
+        raise HTTPException(status_code=502, detail=f"pi-bridge unreachable: {e}") from e
+
+
+@router.post("/custom")
+async def add_custom_provider(body: CustomProviderCreate) -> dict[str, Any]:
+    """Add an OpenAI-compatible provider, then fetch its model list."""
+    import re
+    import uuid
+
+    name = body.name.strip()
+    base_url = body.base_url.strip().rstrip("/")
+    if not name or not base_url or not body.api_key.strip():
+        raise HTTPException(status_code=400, detail="Name, base URL and API key are required")
+
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "provider"
+    pid = f"{CUSTOM_PREFIX}{slug}-{uuid.uuid4().hex[:6]}"
+
+    cfg = load_config()
+    cfg["providers"][pid] = {
+        "name": name,
+        "base_url": base_url,
+        "api_key": body.api_key.strip(),
+        "enabled": True,
+        "connected": False,
+        "models": [],
+        "enabled_models": [],
+        "model_status": {},
+    }
+    save_config(cfg)
+
+    models, error = await _test_connection(pid, cfg["providers"][pid])
+    update_provider_config(pid, {"connected": error is None, "models": models})
+    return {"id": pid, "models": models, "error": error}
+
+
+@router.delete("/custom/{provider_id}")
+async def delete_custom_provider(provider_id: str) -> dict[str, Any]:
+    """Remove a user-added provider, its key and its enabled models."""
+    if not provider_id.startswith(CUSTOM_PREFIX):
+        raise HTTPException(status_code=400, detail="Only custom providers can be removed")
+    cfg = load_config()
+    if provider_id not in cfg["providers"]:
+        raise HTTPException(status_code=404, detail=f"Unknown provider: {provider_id}")
+    del cfg["providers"][provider_id]
+    save_config(cfg)
+    return {"ok": True}
 
 
 @router.put("/{provider_id}")
 async def update_provider(provider_id: str, body: ProviderUpdate) -> dict[str, Any]:
     """Update one provider's configuration."""
-    if provider_id not in PROVIDER_IDS:
+    if not known_provider(provider_id):
         raise HTTPException(status_code=404, detail=f"Unknown provider: {provider_id}")
 
     updates: dict[str, Any] = {}
@@ -72,7 +171,7 @@ async def update_provider(provider_id: str, body: ProviderUpdate) -> dict[str, A
 @router.post("/{provider_id}/test")
 async def test_provider(provider_id: str) -> TestResult:
     """Test the connection for a provider and cache the discovered models."""
-    if provider_id not in PROVIDER_IDS:
+    if not known_provider(provider_id):
         raise HTTPException(status_code=404, detail=f"Unknown provider: {provider_id}")
 
     p = get_provider_config(provider_id)
@@ -103,7 +202,7 @@ async def test_provider(provider_id: str) -> TestResult:
 @router.get("/{provider_id}/models")
 async def get_provider_models(provider_id: str) -> list[str]:
     """Return the cached model list for a provider."""
-    if provider_id not in PROVIDER_IDS:
+    if not known_provider(provider_id):
         raise HTTPException(status_code=404, detail=f"Unknown provider: {provider_id}")
     p = get_provider_config(provider_id)
     raw = p.get("models", [])
@@ -136,6 +235,16 @@ async def _test_connection(
     """
 
     timeout = httpx.Timeout(10.0)
+
+    if provider_id.startswith(CUSTOM_PREFIX):
+        # User-added: OpenAI-compatible GET {base_url}/models
+        url = f"{cfg.get('base_url', '').rstrip('/')}/models"
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            r = await client.get(url, headers={"Authorization": f"Bearer {cfg.get('api_key', '')}"})
+        if r.status_code != 200:
+            return [], f"HTTP {r.status_code}: {r.text[:160]}"
+        ids = [m.get("id", "") for m in r.json().get("data", []) if isinstance(m, dict)]
+        return [i for i in ids if i], None
 
     if provider_id == "pi":
         # Pi OAuth — token is read from ~/.pi/agent/auth.json, no user config needed

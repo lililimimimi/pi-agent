@@ -18,65 +18,16 @@ load_dotenv()  # 自动读取 backend/.env
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.logging import configure_logging
-from app.models.base import MockProvider
-from app.tools.read_file import ReadFileTool
-from app.tools.write_file import WriteFileTool
-from app.tools.git_tool import GitTool
+from app.logging import setup_logging
 
-# --------------------------------------------------------------------------- #
-# Logging
-# --------------------------------------------------------------------------- #
+setup_logging(level=os.getenv("LOG_LEVEL", "DEBUG"))
 
-configure_logging(level=os.getenv("LOG_LEVEL", "INFO"))
-
-# --------------------------------------------------------------------------- #
-# Registries (populated here; importable from app.container everywhere else)
-# --------------------------------------------------------------------------- #
-
-import app.container as container  # noqa: E402  (after configure_logging)
-
-# Default: mock provider for local dev without an API key
-container.model_router.register(MockProvider())
-
-# DeepSeek provider — default when key is present
-if os.getenv("DEEPSEEK_API_KEY"):
-    try:
-        from app.models.deepseek import DeepSeekProvider
-        container.model_router.register(DeepSeekProvider())
-    except Exception:  # noqa: BLE001
-        pass
-
-# Claude provider — only if key is present
-if os.getenv("ANTHROPIC_API_KEY"):
-    try:
-        from app.models.claude import ClaudeProvider
-        container.model_router.register(ClaudeProvider())
-    except Exception:  # noqa: BLE001
-        pass  # log will show the error; app still starts with mock
-
-# Tools
-container.tool_registry.register(ReadFileTool())
-container.tool_registry.register(WriteFileTool())
-container.tool_registry.register(GitTool())
-
-# Security
-from app.security import SecurityInterceptor  # noqa: E402
-container.security_interceptor = SecurityInterceptor(project_root=os.getcwd())
-
-# Sync Pi CLI OAuth + env-var API keys → config.json
+# Sync Pi CLI OAuth + env-var API keys → config.json (used by the model settings UI)
 from app.config.providers import sync_env_vars_to_config, sync_pi_oauth_to_config  # noqa: E402
 sync_pi_oauth_to_config()   # Pi CLI OAuth (Claude.ai 订阅)
 sync_env_vars_to_config()   # env vars (ANTHROPIC_API_KEY 等)
-
-# Register Pi OAuth Claude provider if available
-from app.config.pi_oauth import is_available as pi_oauth_available  # noqa: E402
-if pi_oauth_available():
-    try:
-        from app.models.claude_oauth import ClaudeOAuthProvider
-        container.model_router.register(ClaudeOAuthProvider())
-    except Exception:  # noqa: BLE001
-        pass
+from app.config.providers import sync_codex_login_to_config  # noqa: E402
+sync_codex_login_to_config()  # OpenAI subscription login (Pi auth.json)
 
 # --------------------------------------------------------------------------- #
 # FastAPI app

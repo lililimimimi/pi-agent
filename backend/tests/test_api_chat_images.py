@@ -104,7 +104,7 @@ async def test_session_file_records_text_and_image_count_not_base64(client: Asyn
 
     records = session_store.get_session(persist_id)
     stored = next(rec for rec in records if rec.get("role") == "user")["content"]
-    assert stored == "describe it\n[附图 1 张]"
+    assert stored == "describe it\n[1 image(s) attached]"
     assert PNG_B64 not in str(records)
 
 
