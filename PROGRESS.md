@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-### 已完成（模块 1–13）
+### 已完成（模块 1–16）
 
 - 基础规则、Agent Core、后端 FastAPI、前端 React 架构
 - 安全拦截、多模型路由、集成接线
@@ -14,7 +14,40 @@
 - **前端体验增强**：代码块复制、Context 用量显示、全局 Toast、网络监控、快捷键
 - **执行前确认机制**：Agent 写操作前展示步骤预览卡片，用户确认/取消，60s 超时自动取消
 
-#### 模块 14 具体交付
+#### 模块 16 具体交付
+
+| 类别 | 内容 |
+|------|------|
+| `rules/detector.py` | `StackDetector`：读取 `package.json`（react）、`pyproject.toml` / `requirements.txt`（fastapi） |
+| `rules/engine.py` | `RulesEngine`：全局 `my-workflow` 始终加载，按技术栈加载 React / FastAPI 规范，项目级 `.assistant/rules.md` 最后加载；去掉 frontmatter；缺失文件跳过 |
+| `api/chat.py` | `ChatRequest.project_path`；创建会话时生成规范文本，随请求发给 bridge |
+| `pi-bridge/server.ts` | 接收 `rules`，通过 `DefaultResourceLoader({ appendSystemPrompt })` 注入 system prompt |
+| `chatStore.ts` / `api.ts` | 发送聊天时带上当前项目路径 |
+| `pi-bridge/src/cwd.ts` | 会话工作目录使用所选项目路径（不存在则回退到 bridge 目录）；工具和规范都以此为准 |
+| 测试 | `test_rules_engine.py` 16 个（检测、合并顺序、项目覆盖、缺失文件、接口转发） |
+| 测试结果 | backend 155/155 ✅（无警告），bridge 31/31 ✅，frontend 71/71 ✅ |
+| 验证 | 带自定义规则请求 bridge，模型回复按规则以指定词开头 |
+| 偏离计划 | 计划写的 `agent/core.py` `build_context()` 不存在，且聊天不经过 `AgentLoop`，改为在聊天路径注入；规范文件实际在 `.pi/skills/<name>/SKILL.md` |
+
+#### 模块 15 具体交付
+
+| 类别 | 内容 |
+|------|------|
+| `types.py` | `ImageContent`、`MessageContent`；`Message.content` 支持字符串或分段列表；限制：JPEG/PNG/GIF/WebP、≤5MB、每条最多 4 张 |
+| `api/chat.py` | 校验图片分段；会话文件只存文字 + `[附图 N 张]`；bridge 返回非 200 时向前端发 `error` 事件 |
+| `models/claude.py` | 用户图片转为 Anthropic base64 image block |
+| `models/deepseek.py`、`base.py` | 只取文字，兼容分段内容 |
+| `pi-bridge/src/content.ts` | 文字/图片分段 → Pi `prompt` 输入 |
+| `pi-bridge/src/vision.ts` | 按模型 `input` 能力路由：同 provider 有视觉模型则自动切换，否则忽略图片并提示 |
+| `pi-bridge/server.ts` | 带图片的消息不启用 agent 工具；JSON 请求体上限 100KB → 20MB（默认值会拒收截图） |
+| `InputBar.tsx` | 📎 多选、粘贴（含截图，页面级监听）、拖拽；超过 5MB 的图片先在浏览器里缩小再检查 |
+| `chatStore.ts` | 发送时把当前消息的图片编码为 content 分段；历史消息去掉占位文字 |
+| `lib/image.ts` | 类型/大小校验、`prepareImage` 缩放、粘贴/拖拽文件提取、data URL 解析 |
+| 测试 | 后端 `test_claude_provider.py`（4）、`test_api_chat_images.py`（8）；bridge `content.test.ts`、`vision.test.ts`（+server 大请求用例）；前端 `image.test.ts`、`InputBar.paste.test.tsx`（5）、`sendWithImage.test.ts` |
+| 测试结果 | backend 139/139 ✅，bridge 31/31 ✅，frontend 71/71 ✅ |
+| 顺带修复 | `sessions/store.py` 文件句柄泄漏（消除 ResourceWarning） |
+
+#### 模块 14 具体交付（含后续补充）
 
 | 类别 | 内容 |
 |------|------|
@@ -93,12 +126,10 @@
 | Google Gemini | `GEMINI_API_KEY` | ✅ |
 | Ollama | Base URL（本地，无需 key）| ✅ |
 
-### 待完成（模块 15–19）
+### 待完成（模块 17–19）
 
 | 模块 | 文件 | 内容 |
 |------|------|------|
-| 15 | 15-file-upload.md | 文件上传（通用 + 图片） |
-| 16 | 16-skill-rules.md | Skill 规范文件管理 |
 | 17 | 17-trace.md | 日志追踪 |
 | 18 | 18-tauri.md | Tauri 桌面打包 |
 | 19 | 19-docker.md | Docker 容器隔离（备用） |
@@ -109,4 +140,4 @@
 
 ## 下一步
 
-等待用户审核模块 14，之后从 `docs/plans/15-file-upload.md` 开始。
+等待用户审核模块 16，之后从 `docs/plans/17-trace.md` 开始。

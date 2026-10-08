@@ -29,16 +29,16 @@ def build_rules(self, project_path: str) -> str:
 
 ## 步骤
 
-- [ ] 写 `detector.py`（读文件内容，返回 set[str]）
-- [ ] 写 `engine.py`（加载 + 合并，文件缺失时跳过）
-- [ ] 写测试（单栈/双栈/无规范/项目级覆盖）
-- [ ] 接入 `agent/core.py` 的 `build_context()`（注入 system prompt）
-- [ ] `pytest tests/test_rules_engine.py -v` → 通过
+- [x] 写 `detector.py`（读文件内容，返回 set[str]）
+- [x] 写 `engine.py`（加载 + 合并，文件缺失时跳过）
+- [x] 写测试（单栈/双栈/无规范/项目级覆盖）
+- [x] 接入 system prompt（偏离计划：`agent/core.py` 没有 `build_context()`，且聊天不经过 `AgentLoop`；实际路径为 `api/chat.py` 生成规范 → bridge 通过 `appendSystemPrompt` 注入）
+- [x] `pytest tests/test_rules_engine.py -v` → 通过（16 个）
 
 ## ⏸ 审核后全部模块完成
 
 ## 验收标准
-- [ ] 安装依赖并通过所有测试：`pip install -e ".[dev]" && python -m pytest tests/ -v`
-- [ ] 无警告，无跳过（0 failed, 0 skipped）
+- [x] 安装依赖并通过所有测试：`pip install -e ".[dev]" && python -m pytest tests/ -v`
+- [x] 无警告，无跳过（0 failed, 0 skipped）
 - [ ] 我审核代码通过
 - [ ] 我确认后才 commit
