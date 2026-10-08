@@ -62,20 +62,20 @@ GET /api/files/content?path=<file>        → 文件内容（文本）
 
 ## 步骤
 
-- [ ] 写 `api/files.py`（tree endpoint + content endpoint + 安全校验）
-- [ ] 写 `fileBrowserStore.ts`（根路径配置、展开状态管理）
-- [ ] 写 `FileTreeNode.tsx`（递归渲染，展开/折叠动画）
-- [ ] 写 `FileBrowser.tsx`（搜索框 + 树 + 选择根目录按钮）
-- [ ] 接入 InputBar：点击文件 → 填充消息草稿 + 附加文件内容
-- [ ] 集成到 layout：FileBrowser 与 SessionSidebar 切换（Tab 或分区）
-- [ ] 写测试（tree 构建、忽略规则、content 读取、路径安全校验）
-- [ ] `pytest tests/test_files_api.py -v` → 通过
+- [x] 写 `api/files.py`（tree endpoint + content endpoint + 安全校验）
+- [x] 写 `fileBrowserStore.ts`（根路径配置、展开状态管理）
+- [x] 写 `FileTreeNode.tsx`（递归渲染，展开/折叠动画）
+- [x] 写 `FileBrowser.tsx`（搜索框 + 树 + 选择根目录按钮）
+- [x] 接入 InputBar：点击文件 → 填充消息草稿 + 附加文件内容
+- [x] 集成到 layout：FileBrowser 与 SessionSidebar 切换（Tab 或分区）
+- [x] 写测试（tree 构建、忽略规则、content 读取、路径安全校验）
+- [x] `pytest tests/test_files_api.py -v` → 通过
 
 ## ⏸ 审核后继续
 
 ## 验收标准
-- [ ] 侧边栏展示项目文件树，支持展开/折叠
-- [ ] 点击文件自动填充输入框，附加文件内容
-- [ ] `node_modules/`、`.git/` 等目录自动隐藏
-- [ ] 只能读取用户选定根目录内的文件（路径穿越防护）
-- [ ] `pytest tests/test_files_api.py -v` → 通过，0 failed
+- [x] 侧边栏展示项目文件树，支持展开/折叠
+- [x] 点击文件自动填充输入框，附加文件内容
+- [x] `node_modules/`、`.git/` 等目录自动隐藏
+- [x] 只能读取用户选定根目录内的文件（路径穿越防护）
+- [x] `pytest tests/test_files_api.py -v` → 通过，0 failed

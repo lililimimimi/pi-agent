@@ -107,6 +107,7 @@ from app.api.projects import router as projects_router  # noqa: E402
 from app.api.filesystem import router as filesystem_router  # noqa: E402
 from app.api.providers import router as providers_router  # noqa: E402
 from app.api.preview import router as preview_router  # noqa: E402
+from app.api.files import router as files_router  # noqa: E402
 
 app.include_router(chat_router)
 app.include_router(models_router)
@@ -115,3 +116,4 @@ app.include_router(projects_router)
 app.include_router(filesystem_router)
 app.include_router(providers_router)
 app.include_router(preview_router)
+app.include_router(files_router)

@@ -5,7 +5,7 @@ from typing import Any, AsyncIterator
 
 from pydantic import BaseModel
 
-from app.types import TextChunk, ToolCallChunk, Message
+from app.types import TextChunk, ToolCallChunk, Message, text_of
 
 
 class ModelInfo(BaseModel):
@@ -65,5 +65,5 @@ class MockProvider(ModelProvider):
         messages: list[Message],
         tools: list[dict[str, Any]],
     ) -> AsyncIterator[TextChunk | ToolCallChunk]:
-        last = messages[-1].content if messages else ""
+        last = text_of(messages[-1].content) if messages else ""
         yield TextChunk(content=f"Mock response to: {last}")

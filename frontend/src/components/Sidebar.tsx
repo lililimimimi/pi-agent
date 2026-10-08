@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useChatStore } from '@/stores/chatStore'
 import { AddProjectModal } from '@/components/AddProjectModal'
+import { FileBrowser } from '@/components/FileBrowser'
+import { useFileBrowserStore } from '@/stores/fileBrowserStore'
+import { useLayoutStore, clampSidebarWidth } from '@/stores/layoutStore'
 import {
   Plus, Settings, MessageSquare, Folder, FolderOpen,
   MoreHorizontal, Pencil, Trash2, Check, FolderPlus, Search,
@@ -231,6 +234,25 @@ function ProjectRow({ project, isActive }: { project: { id: string; name: string
 
 // ── Main sidebar ──────────────────────────────────────────────────────────────
 export function Sidebar({ onSettingsClick }: SidebarProps) {
+  const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
+  const setSidebarWidth = useLayoutStore((s) => s.setSidebarWidth)
+
+  // Drag the right edge to resize
+  const handleResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = sidebarWidth
+    const onMove = (ev: PointerEvent) => {
+      setSidebarWidth(clampSidebarWidth(startWidth + (ev.clientX - startX), window.innerWidth))
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
   const projects = useChatStore((s) => s.projects)
   const activeProjectId = useChatStore((s) => s.activeProjectId)
   const sessions = useChatStore((s) => s.sessions)
@@ -238,6 +260,8 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
   const newSession = useChatStore((s) => s.newSession)
   const bulkDeleteSessions = useChatStore((s) => s.bulkDeleteSessions)
   const isStreaming = useChatStore((s) => s.isStreaming)
+  const sidebarView = useFileBrowserStore((s) => s.view)
+  const setSidebarView = useFileBrowserStore((s) => s.setView)
 
   const [addingProject, setAddingProject] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -289,7 +313,17 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
   }
 
   return (
-    <aside className="w-52 shrink-0 h-full flex flex-col border-r border-border bg-[#E8E8ED]">
+    <aside
+      style={{ width: sidebarWidth }}
+      className="relative shrink-0 h-full flex flex-col border-r border-border bg-[#E8E8ED]"
+    >
+      <div
+        onPointerDown={handleResizeStart}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+        className="absolute right-0 top-0 bottom-0 z-10 w-1.5 translate-x-1/2 cursor-col-resize hover:bg-foreground/10 transition-colors"
+      />
       {/* Header */}
       <div className="flex items-center gap-2 px-4 h-[61px] border-b border-border/40">
         <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-foreground shrink-0">
@@ -306,8 +340,30 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
         </button>
       </div>
 
+      {/* View switcher */}
+      <div className="px-3 pt-3">
+        <div className="flex rounded-lg bg-black/[0.05] p-0.5 text-xs font-medium">
+          {(['sessions', 'files'] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setSidebarView(v)}
+              className={`flex-1 rounded-md py-1 transition-colors ${
+                sidebarView === v ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {v === 'sessions' ? 'Sessions' : 'Files'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {sidebarView === 'files' && <FileBrowser />}
+
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+      <div
+        hidden={sidebarView === 'files'}
+        className="flex-1 overflow-y-auto px-3 py-3 space-y-4"
+      >
 
         {/* Global search — above projects */}
         <div className="px-1">

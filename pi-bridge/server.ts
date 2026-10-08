@@ -16,6 +16,8 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import { buildPreview, isWriteTool, PreviewRegistry } from "./src/preview.js";
+import { toPromptInput } from "./src/content.js";
+import { pickModelForImages, supportsImages } from "./src/vision.js";
 
 // Pi CLI does this at startup: forces HTTP/1.1 (allowH2: false).
 // Without it, Node.js uses HTTP/2 which Anthropic rejects for OAuth tokens → 403.
@@ -122,7 +124,8 @@ function makePreviewExtension(ctrl: PreviewController) {
 }
 
 export const app = express();
-app.use(express.json());
+// Images are sent inline as base64, so a single message can be several MB
+app.use(express.json({ limit: "20mb" }));
 
 app.post("/chat", async (req, res) => {
   console.log(`[bridge] POST /chat body:`, JSON.stringify(req.body)?.slice(0, 200));
@@ -175,6 +178,22 @@ app.post("/chat", async (req, res) => {
     console.log(`[bridge] model resolved: ${provider}/${modelId} found=${!!model}`);
   }
 
+  // Images are only sent to models that accept them. For other models, switch to
+  // a vision model from the same provider if one exists, otherwise drop the images.
+  let imagesDropped = false;
+  const lastUser = (messages as Array<{ role: string; content: unknown }>).filter(m => m.role === "user").at(-1);
+  const wantsImages = toPromptInput(lastUser?.content).images.length > 0;
+  if (model && wantsImages && !supportsImages(model)) {
+    const choice = pickModelForImages(model, await runtime.getAvailable());
+    if (choice.kind === "switch") {
+      send("text", { content: `> 当前模型不支持图片，已自动切换到 ${choice.model.name} 处理图片。\n\n` });
+      model = choice.model;
+    } else {
+      imagesDropped = true;
+      send("text", { content: "> 当前模型不支持图片，图片已忽略，仅根据文字回答。请切换到支持图片的模型。\n\n" });
+    }
+  }
+
   let session: AgentSession;
   try {
     console.log(`[bridge] createAgentSession...`);
@@ -190,7 +209,8 @@ app.post("/chat", async (req, res) => {
     const result = await createAgentSession({
       sessionManager: SessionManager.inMemory(),
       modelRuntime: runtime,
-      tools: ["read", "bash", "edit", "write"],
+      // Image questions are answered directly; tools would only add a detour and an approval wait
+      tools: wantsImages ? [] : ["read", "bash", "edit", "write"],
       ...(model ? { model } : {}),
       ...(resourceLoader ? { resourceLoader } : {}),
     });
@@ -262,7 +282,7 @@ app.post("/chat", async (req, res) => {
     }
   });
 
-  const userMessages = (messages as Array<{ role: string; content: string }>).filter(m => m.role === "user");
+  const userMessages = (messages as Array<{ role: string; content: unknown }>).filter(m => m.role === "user");
   const lastUserMsg = userMessages[userMessages.length - 1];
   if (!lastUserMsg) {
     send("error", { message: "No user message found" });
@@ -273,7 +293,9 @@ app.post("/chat", async (req, res) => {
   }
 
   try {
-    await session.prompt(lastUserMsg.content);
+    const { text, images } = toPromptInput(lastUserMsg.content);
+    const sendImages = imagesDropped ? [] : images;
+    await session.prompt(text, sendImages.length > 0 ? { images: sendImages } : undefined);
   } catch (err: unknown) {
     if (!ended) {
       send("error", { message: err instanceof Error ? err.message : "Unknown error" });

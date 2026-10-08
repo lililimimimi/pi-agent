@@ -6,7 +6,7 @@ import os
 from typing import Any, AsyncIterator
 
 from app.models.base import ModelProvider, ModelInfo
-from app.types import Message, Role, TextChunk, ToolCallChunk
+from app.types import Message, Role, TextChunk, ToolCallChunk, text_of
 
 
 # ---------------------------------------------------------------------------
@@ -39,17 +39,39 @@ _MODELS: list[ModelInfo] = [
 # Message conversion helpers
 # ---------------------------------------------------------------------------
 
+def _user_content(msg: Message) -> str | list[dict[str, Any]]:
+    """Plain string for text-only messages, content blocks when images are attached."""
+    if isinstance(msg.content, str):
+        return msg.content
+    blocks: list[dict[str, Any]] = []
+    for part in msg.content:
+        if part.type == "text" and part.text:
+            blocks.append({"type": "text", "text": part.text})
+        elif part.type == "image" and part.image is not None:
+            blocks.append(
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": part.image.media_type,
+                        "data": part.image.data,
+                    },
+                }
+            )
+    return blocks
+
+
 def _to_anthropic_messages(messages: list[Message]) -> list[dict[str, Any]]:
     """Convert internal Message list → Anthropic API message format."""
     result: list[dict[str, Any]] = []
     for msg in messages:
         if msg.role == Role.USER:
-            result.append({"role": "user", "content": msg.content})
+            result.append({"role": "user", "content": _user_content(msg)})
 
         elif msg.role == Role.ASSISTANT:
             content: list[dict[str, Any]] = []
-            if msg.content:
-                content.append({"type": "text", "text": msg.content})
+            if text_of(msg.content):
+                content.append({"type": "text", "text": text_of(msg.content)})
             if msg.tool_calls:
                 for tc in msg.tool_calls:
                     content.append(

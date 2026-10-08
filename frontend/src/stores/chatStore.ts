@@ -3,9 +3,11 @@ import {
   createChat, streamChat, approveToolCall, fetchDefaultModel,
   fetchSessions, fetchSession, deleteSessionApi, bulkDeleteSessionsApi,
   fetchProjects, createProjectApi, deleteProjectApi,
+  type ContentPart,
 } from '@/services/api'
 import type { ExecutionPreview } from '@/components/ExecutionPreviewCard'
-import type { Message, TokenUsage, ToolCall, ToolResult } from '@/types'
+import type { Message, ImageAttachment, TokenUsage, ToolCall, ToolResult } from '@/types'
+import { parseDataUrl, stripImageMarker } from '@/lib/image'
 
 // ── Domain types ─────────────────────────────────────────────────────────────
 export type Project = {
@@ -43,6 +45,18 @@ const makeSession = (projectId: string): SessionSnapshot => ({
   backendSessionId: null,
   persistId: null,
 })
+
+/** Builds the API content for a message: plain text, or text + image parts. */
+function toApiContent(m: Message, includeImages: boolean): string | ContentPart[] {
+  const images = includeImages ? (m.images ?? []) : []
+  if (images.length === 0) return m.content
+  const parts: ContentPart[] = m.content ? [{ type: 'text', text: m.content }] : []
+  for (const image of images) {
+    const { mediaType, data } = parseDataUrl(image.dataUrl)
+    parts.push({ type: 'image', image: { media_type: mediaType, data } })
+  }
+  return parts
+}
 
 // ── Permission request ────────────────────────────────────────────────────────
 export type PermissionRequest = {
@@ -109,7 +123,7 @@ type ChatState = {
 
   // Model
   setModel: (provider: string, model: string) => void
-  sendMessage: (content: string) => Promise<void>
+  sendMessage: (content: string, images?: ImageAttachment[]) => Promise<void>
   approveToolCall: (toolCallId: string, approved: boolean) => Promise<void>
   reset: () => void
   initProvider: () => Promise<void>
@@ -229,7 +243,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           .map((r: any) => ({
             id: `restored-${++msgCounter}`,
             role: r.role as 'user' | 'assistant',
-            content: r.content || '',
+            content: stripImageMarker(r.content || ''),
           }))
       } catch {
         // ignore
@@ -415,8 +429,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // ── Message actions ────────────────────────────────────────────────────────
-  sendMessage: async (content: string) => {
-    const userMsg: Message = { id: nextMsgId(), role: 'user', content }
+  sendMessage: async (content: string, images: ImageAttachment[] = []) => {
+    const userMsg: Message = { id: nextMsgId(), role: 'user', content, images: images.length > 0 ? images : undefined }
     set((s) => ({ messages: [...s.messages, userMsg], isStreaming: true, error: null, agentStatus: 'thinking' as const, lastEventAt: Date.now(), permissionRequests: new Map() }))
 
     // Auto-title from first user message
@@ -430,7 +444,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ abortController: controller })
 
     try {
-      const history = get().messages.map((m) => ({ role: m.role, content: m.content }))
+      // Only the message being sent carries its images; earlier images are not re-sent
+      const allMessages = get().messages
+      const history = allMessages.map((m, i) => ({
+        role: m.role,
+        content: toApiContent(m, i === allMessages.length - 1),
+      }))
       const { provider, model, sessions, activeId } = get()
       const currentSession = sessions.find((s) => s.id === activeId)
       const result = await createChat(history, provider, model, currentSession?.persistId ?? undefined)
