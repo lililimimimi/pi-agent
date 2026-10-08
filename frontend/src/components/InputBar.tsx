@@ -1,6 +1,7 @@
-import { useState, useRef, type KeyboardEvent, type ChangeEvent } from 'react'
+import { useState, useRef, useEffect, type KeyboardEvent, type ChangeEvent } from 'react'
 import { useChatStore } from '@/stores/chatStore'
-import { ArrowUp, Paperclip, Square, X } from 'lucide-react'
+import { useFileBrowserStore, type PendingFile } from '@/stores/fileBrowserStore'
+import { ArrowUp, FileText, Paperclip, Square, X } from 'lucide-react'
 import type { ImageAttachment } from '@/types'
 
 let attachCounter = 0
@@ -8,18 +9,37 @@ let attachCounter = 0
 export function InputBar({ bare = false }: { bare?: boolean }) {
   const [text, setText] = useState('')
   const [images, setImages] = useState<ImageAttachment[]>([])
+  const [attachedFile, setAttachedFile] = useState<PendingFile | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sendMessage = useChatStore((s) => s.sendMessage)
   const stopAgent = useChatStore((s) => s.stopAgent)
   const isStreaming = useChatStore((s) => s.isStreaming)
+  const pendingFile = useFileBrowserStore((s) => s.pendingFile)
+  const clearPendingFile = useFileBrowserStore((s) => s.clearPendingFile)
+
+  // File clicked in the sidebar tree → prefill the prompt and attach its content
+  useEffect(() => {
+    if (!pendingFile) return
+    const prompt = `请分析这个文件：\`${pendingFile.path}\``
+    setText((prev) => (prev.trim() ? `${prev.trimEnd()}\n${prompt}` : prompt))
+    setAttachedFile(pendingFile)
+    clearPendingFile()
+    textareaRef.current?.focus()
+  }, [pendingFile, clearPendingFile])
 
   const canSend = text.trim().length > 0 && !isStreaming
 
   const handleSend = () => {
     if (!canSend) return
-    sendMessage(text.trim())
+    const prompt = text.trim()
+    const message = attachedFile
+      ? `${prompt}\n\n文件 \`${attachedFile.path}\`：\n\`\`\`\n${attachedFile.content}\n\`\`\``
+      : prompt
+    sendMessage(message)
     setText('')
     setImages([])
+    setAttachedFile(null)
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -75,6 +95,22 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
           </div>
         )}
 
+        {/* Attached file chip */}
+        {attachedFile && (
+          <div className="flex mb-3">
+            <div className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/50 bg-card px-2.5 py-1 text-xs text-foreground/70">
+              <FileText className="h-3 w-3 shrink-0 text-muted-foreground/60" strokeWidth={1.8} />
+              <span className="truncate">{attachedFile.path}</span>
+              <button
+                onClick={() => setAttachedFile(null)}
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Spotlight-style input container */}
         <div className="flex items-end gap-2 bg-card rounded-2xl border border-border shadow-sm px-4 py-3 transition-shadow focus-within:shadow-md focus-within:border-foreground/20">
           <input
@@ -94,6 +130,7 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
           </button>
 
           <textarea
+            ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
