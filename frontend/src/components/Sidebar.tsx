@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useChatStore } from '@/stores/chatStore'
 import { AddProjectModal } from '@/components/AddProjectModal'
+import { FileBrowser } from '@/components/FileBrowser'
+import { useFileBrowserStore } from '@/stores/fileBrowserStore'
 import {
   Plus, Settings, MessageSquare, Folder, FolderOpen,
   MoreHorizontal, Pencil, Trash2, Check, FolderPlus, Search,
@@ -238,6 +240,8 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
   const newSession = useChatStore((s) => s.newSession)
   const bulkDeleteSessions = useChatStore((s) => s.bulkDeleteSessions)
   const isStreaming = useChatStore((s) => s.isStreaming)
+  const sidebarView = useFileBrowserStore((s) => s.view)
+  const setSidebarView = useFileBrowserStore((s) => s.setView)
 
   const [addingProject, setAddingProject] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -306,8 +310,30 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
         </button>
       </div>
 
+      {/* View switcher */}
+      <div className="px-3 pt-3">
+        <div className="flex rounded-lg bg-black/[0.05] p-0.5 text-xs font-medium">
+          {(['sessions', 'files'] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setSidebarView(v)}
+              className={`flex-1 rounded-md py-1 transition-colors ${
+                sidebarView === v ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {v === 'sessions' ? 'Sessions' : 'Files'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {sidebarView === 'files' && <FileBrowser />}
+
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+      <div
+        hidden={sidebarView === 'files'}
+        className="flex-1 overflow-y-auto px-3 py-3 space-y-4"
+      >
 
         {/* Global search — above projects */}
         <div className="px-1">

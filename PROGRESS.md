@@ -14,6 +14,20 @@
 - **前端体验增强**：代码块复制、Context 用量显示、全局 Toast、网络监控、快捷键
 - **执行前确认机制**：Agent 写操作前展示步骤预览卡片，用户确认/取消，60s 超时自动取消
 
+#### 模块 14 具体交付
+
+| 类别 | 内容 |
+|------|------|
+| `api/files.py` | `GET /api/files/tree`（`root`/`dir`/`depth`，懒加载）、`GET /api/files/content`（`root`+`path`）；忽略 `node_modules`/`.git`/`__pycache__`/`*.pyc`；路径穿越、绝对路径、symlink 逃逸返回 403；二进制 415、超过 1MB 413 |
+| `main.py` | 注册 `files_router` |
+| `fileBrowserStore.ts` | 根路径、按目录缓存的子节点、展开状态、待附加文件；侧边栏切换视图 |
+| `FileTreeNode.tsx` | 递归树节点，展开/折叠（grid-rows 过渡动画），点击文件触发读取 |
+| `FileBrowser.tsx` | 跟随当前项目目录、按已加载节点搜索、「Choose root folder」 |
+| `Sidebar.tsx` | Sessions / Files 分段切换 |
+| `InputBar.tsx` | 点击文件 → 填充「请分析这个文件」草稿 + 文件 chip；发送时附加文件内容 |
+| 测试 | `test_files_api.py` 18 用例、`fileBrowserStore.test.ts` 4 用例 |
+| 测试结果 | backend 126/126 ✅，frontend 42/42 ✅ |
+
 #### 模块 13 具体交付
 
 | 类别 | 内容 |
@@ -79,11 +93,10 @@
 | Google Gemini | `GEMINI_API_KEY` | ✅ |
 | Ollama | Base URL（本地，无需 key）| ✅ |
 
-### 待完成（模块 13–19）
+### 待完成（模块 15–19）
 
 | 模块 | 文件 | 内容 |
 |------|------|------|
-| 14 | 14-file-browser.md | 项目文件浏览（侧边栏文件树） |
 | 15 | 15-file-upload.md | 文件上传（通用 + 图片） |
 | 16 | 16-skill-rules.md | Skill 规范文件管理 |
 | 17 | 17-trace.md | 日志追踪 |
@@ -96,4 +109,4 @@
 
 ## 下一步
 
-从 `docs/plans/14-file-browser.md` 开始。
+等待用户审核模块 14，之后从 `docs/plans/15-file-upload.md` 开始。

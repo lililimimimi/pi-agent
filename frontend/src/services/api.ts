@@ -284,3 +284,38 @@ export async function mkdirApi(parent: string, name: string): Promise<string> {
   const data = await res.json()
   return data.path
 }
+
+// ── Project file browser ──────────────────────────────────────────
+
+export type FileNode = {
+  name: string
+  type: 'dir' | 'file'
+  path: string  // relative to the project root; '' for the root itself
+  size?: number
+  children?: FileNode[] | null  // null = directory not expanded by the server
+}
+
+export type FileContent = { path: string; content: string; size: number }
+
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  const data = await res.json().catch(() => null)
+  return data?.detail || `${fallback}: ${res.status}`
+}
+
+/**
+ * List one directory under `root`. `dir` is relative to root ('' = root itself).
+ */
+export async function fetchFileTree(root: string, dir = '', depth = 1): Promise<FileNode> {
+  const params = new URLSearchParams({ root, depth: String(depth) })
+  if (dir) params.set('dir', dir)
+  const res = await fetch(`${BASE}/files/tree?${params}`)
+  if (!res.ok) throw new Error(await errorMessage(res, 'Failed to load files'))
+  return await res.json()
+}
+
+export async function fetchFileContent(root: string, path: string): Promise<FileContent> {
+  const params = new URLSearchParams({ root, path })
+  const res = await fetch(`${BASE}/files/content?${params}`)
+  if (!res.ok) throw new Error(await errorMessage(res, 'Failed to read file'))
+  return await res.json()
+}
