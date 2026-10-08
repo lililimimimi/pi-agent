@@ -283,3 +283,136 @@ class TestTitleTruncation:
         assert meta["type"] == "meta"
         assert len(meta["title"]) <= 20
         assert meta["title"] == long_msg[:20]
+
+
+class TestRevealSession:
+    async def test_reveal_selects_the_session_file(self, client, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock, patch
+        meta = store.create_session(title="reveal me")
+        monkeypatch.setattr("app.api.sessions.sys.platform", "darwin")
+        with patch("app.api.sessions.subprocess.run") as run:
+            r = await client.post(f"/api/sessions/{meta.id}/reveal")
+        assert r.status_code == 200
+        args = run.call_args[0][0]
+        assert args[:2] == ["open", "-R"]
+        assert args[2].endswith(f"{meta.id}.jsonl")
+
+    async def test_reveal_rejects_path_traversal(self, client):
+        r = await client.post("/api/sessions/..%2Fsecret/reveal")
+        assert r.status_code in (400, 404)
+
+    async def test_reveal_unknown_session_returns_404(self, client):
+        r = await client.post("/api/sessions/does-not-exist/reveal")
+        assert r.status_code == 404
+
+
+class TestDeleteProjectSessions:
+    def test_removes_only_sessions_of_that_project(self, tmp_path):
+        mine = store.create_session(title="mine", project_id="/proj/a")
+        other = store.create_session(title="other", project_id="/proj/b")
+        native_dir = store._sessions_dir() / "--proj-a--"
+        native_dir.mkdir()
+        (native_dir / "x.jsonl").write_text('{"type":"session","id":"n1"}\n', encoding="utf-8")
+
+        removed = store.delete_project_sessions("/proj/a")
+
+        assert removed == 2
+        assert not (store._sessions_dir() / f"{mine.id}.jsonl").exists()
+        assert (store._sessions_dir() / f"{other.id}.jsonl").exists()
+        assert not native_dir.exists()
+
+    def test_empty_path_removes_nothing(self):
+        store.create_session(title="keep", project_id="")
+        assert store.delete_project_sessions("") == 0
+
+
+async def test_delete_project_with_sessions_removes_its_session_files(client, tmp_path):
+    folder = tmp_path / "rules"
+    folder.mkdir()
+    created = (await client.post("/api/projects", json={"name": "rules", "path": str(folder)})).json()
+    store.create_session(title="a", project_id=str(folder))
+
+    r = await client.delete(f"/api/projects/{created['id']}", params={"delete_sessions": "true"})
+
+    assert r.json()["deleted_sessions"] == 1
+    assert not [s for s in store.list_sessions() if s.project_id == str(folder)]
+
+
+class TestDeleteProjectFolder:
+    async def test_moves_the_folder_to_trash_when_asked(self, client, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock, patch
+        monkeypatch.setattr("app.api.projects.Path.home", classmethod(lambda cls: tmp_path / "home"))
+        monkeypatch.setattr("app.api.projects.sys.platform", "darwin")
+        folder = tmp_path / "home" / "Desktop" / "rules"
+        folder.mkdir(parents=True)
+        created = (await client.post("/api/projects", json={"name": "rules", "path": str(folder)})).json()
+
+        with patch("app.api.projects.subprocess.run", MagicMock()) as run:
+            r = await client.delete(f"/api/projects/{created['id']}", params={"delete_folder": "true"})
+
+        assert r.status_code == 200
+        assert r.json()["folder_deleted"] is True
+        script = run.call_args[0][0][-1]
+        assert script.startswith('tell application "Finder" to delete POSIX file')
+        assert str(folder) in script
+
+    async def test_keeps_project_when_trash_fails(self, client, tmp_path, monkeypatch):
+        import subprocess
+        from unittest.mock import patch
+        monkeypatch.setattr("app.api.projects.Path.home", classmethod(lambda cls: tmp_path / "home"))
+        monkeypatch.setattr("app.api.projects.sys.platform", "darwin")
+        folder = tmp_path / "home" / "Desktop" / "stubborn"
+        folder.mkdir(parents=True)
+        created = (await client.post("/api/projects", json={"name": "stubborn", "path": str(folder)})).json()
+
+        err = subprocess.CalledProcessError(1, "osascript", stderr="permission denied")
+        with patch("app.api.projects.subprocess.run", side_effect=err):
+            r = await client.delete(f"/api/projects/{created['id']}", params={"delete_folder": "true"})
+
+        assert r.status_code == 500
+        assert "permission denied" in r.json()["detail"]
+        # The project stays listed, so the user can try again
+        assert any(p.id == created["id"] for p in store.list_projects())
+
+    async def test_keeps_the_folder_by_default(self, client, tmp_path):
+        folder = tmp_path / "keep-me"
+        folder.mkdir()
+        created = (await client.post("/api/projects", json={"name": "keep", "path": str(folder)})).json()
+
+        await client.delete(f"/api/projects/{created['id']}")
+
+        assert folder.exists()
+
+    async def test_refuses_to_delete_the_home_folder(self, client, tmp_path, monkeypatch):
+        home = tmp_path / "home"
+        home.mkdir()
+        monkeypatch.setattr("app.api.projects.Path.home", classmethod(lambda cls: home))
+        created = (await client.post("/api/projects", json={"name": "home", "path": str(home)})).json()
+
+        r = await client.delete(f"/api/projects/{created['id']}", params={"delete_folder": "true"})
+
+        assert r.status_code == 400
+        assert home.exists()
+
+
+class TestRevealProjectFolder:
+    async def test_opens_the_project_folder_in_finder(self, client, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock, patch
+        monkeypatch.setattr("app.api.projects.sys.platform", "darwin")
+        folder = tmp_path / "shown"
+        folder.mkdir()
+        created = (await client.post("/api/projects", json={"name": "shown", "path": str(folder)})).json()
+
+        with patch("app.api.projects.subprocess.run", MagicMock()) as run:
+            r = await client.post(f"/api/projects/{created['id']}/reveal")
+
+        assert r.status_code == 200
+        assert run.call_args[0][0] == ["open", str(folder.resolve())]
+
+    async def test_missing_folder_returns_404(self, client, tmp_path):
+        gone = tmp_path / "gone"
+        gone.mkdir()
+        created = (await client.post("/api/projects", json={"name": "gone", "path": str(gone)})).json()
+        gone.rmdir()  # the folder disappears after the project was added
+        r = await client.post(f"/api/projects/{created['id']}/reveal")
+        assert r.status_code == 404

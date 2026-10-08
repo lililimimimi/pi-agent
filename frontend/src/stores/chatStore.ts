@@ -58,6 +58,18 @@ function toApiContent(m: Message, includeImages: boolean): string | ContentPart[
   return parts
 }
 
+/** Converts stored session records into chat messages (text only). */
+function recordsToMessages(records: any[]): Message[] {
+  let counter = 0
+  return records
+    .filter((r: any) => r.type === 'message')
+    .map((r: any) => ({
+      id: `restored-${++counter}`,
+      role: r.role as 'user' | 'assistant',
+      content: stripImageMarker(r.content || ''),
+    }))
+}
+
 // ── Permission request ────────────────────────────────────────────────────────
 export type PermissionRequest = {
   toolCallId: string
@@ -110,8 +122,9 @@ type ChatState = {
   addProject: (name: string, path?: string) => void
   loadPersistedProjects: () => Promise<void>
   renameProject: (id: string, name: string) => void
-  deleteProject: (id: string) => void
+  deleteProject: (id: string, deleteFolder?: boolean) => void
   switchProject: (id: string) => void
+  restoreLastView: () => Promise<void>
 
   // Abort
   abortController: AbortController | null
@@ -220,6 +233,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
       })
     } catch {
       // silently ignore if backend unavailable
+    }
+  },
+
+  // Return to the project and conversation that were open before a reload
+  restoreLastView: async () => {
+    try {
+      const saved = readLastView()
+      if (!saved) return
+      const project = saved.projectPath
+        ? get().projects.find((p) => p.path === saved.projectPath)
+        : undefined
+      if (project && project.id !== get().activeProjectId) get().switchProject(project.id)
+      if (saved.persistId) {
+        const target = get().sessions.find((s) => s.persistId === saved.persistId)
+        if (!target) return
+        if (target.id !== get().activeId) {
+          await get().switchSession(target.id)
+        } else if (get().messages.length === 0 && target.persistId) {
+          // switchProject may already have selected this session without loading it
+          const messages = recordsToMessages(await fetchSession(target.persistId))
+          set((s) => ({
+            messages,
+            sessions: s.sessions.map((x) => (x.id === target.id ? { ...x, messages } : x)),
+          }))
+        }
+      }
+    } finally {
+      // Only start saving once the saved view has been read and applied
+      viewRestored = true
     }
   },
 
@@ -363,12 +405,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((s) => ({ projects: s.projects.map((p) => p.id === id ? { ...p, name } : p) }))
   },
 
-  deleteProject: (id) => {
+  deleteProject: (id, deleteFolder = false) => {
     const { projects, sessions, activeProjectId, activeId } = get()
     if (projects.length === 1) return // can't delete last
 
+    // Confirmation is shown by the UI (DeleteProjectDialog) before this is called.
+    // Sessions are always removed with the project; the folder only when asked.
     // Call backend — pi-native projects go to ignored list, regular projects delete from json
-    deleteProjectApi(id).catch(() => {})
+    deleteProjectApi(id, { deleteSessions: true, deleteFolder }).catch((err: Error) => {
+      console.error('Delete project failed:', err.message)
+    })
 
     const remaining = projects.filter((p) => p.id !== id)
     const remainingSessions = sessions.filter((s) => s.projectId !== id)
@@ -452,7 +498,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }))
       const { provider, model, sessions, activeId } = get()
       const currentSession = sessions.find((s) => s.id === activeId)
-      const result = await createChat(history, provider, model, currentSession?.persistId ?? undefined)
+      const projectPath = get().projects.find((p) => p.id === get().activeProjectId)?.path
+      const result = await createChat(history, provider, model, currentSession?.persistId ?? undefined, projectPath)
       const sessionId = result.session_id
       const persistId = result.persist_id
       set({ sessionId })
@@ -568,3 +615,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 }))
+
+// ── Last open view (survives reloads) ─────────────────────────────────────────
+// Projects get new ids on every load, so the project is remembered by its folder
+// path; sessions are remembered by their persisted id.
+const LAST_VIEW_KEY = 'pi.lastView'
+
+function readLastView(): { projectPath?: string; persistId?: string } | null {
+  try {
+    return JSON.parse(localStorage.getItem(LAST_VIEW_KEY) ?? 'null')
+  } catch {
+    return null
+  }
+}
+
+let lastSavedView = ''
+let viewRestored = false
+useChatStore.subscribe((s) => {
+  if (!viewRestored) return  // loading projects/sessions must not overwrite the saved view
+  const projectPath = s.projects.find((p) => p.id === s.activeProjectId)?.path
+  const persistId = s.sessions.find((x) => x.id === s.activeId)?.persistId ?? undefined
+  const view = JSON.stringify({ projectPath, persistId })
+  if (view === lastSavedView) return
+  lastSavedView = view
+  try {
+    localStorage.setItem(LAST_VIEW_KEY, view)
+  } catch {
+    // storage can be unavailable (private windows); restoring is optional
+  }
+})
+

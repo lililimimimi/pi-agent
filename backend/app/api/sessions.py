@@ -8,6 +8,10 @@ DELETE /api/sessions/:id      → delete a session
 """
 from __future__ import annotations
 
+import re
+import subprocess
+import sys
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -66,3 +70,21 @@ class BulkDeleteRequest(BaseModel):
 async def bulk_delete_sessions(req: BulkDeleteRequest):
     results = store.bulk_delete_sessions(req.ids)
     return {"results": results}
+
+
+_SAFE_ID = re.compile(r"^[A-Za-z0-9_.\-]+$")
+
+
+@router.post("/{session_id}/reveal")
+async def reveal_session_file(session_id: str) -> dict[str, str]:
+    """Select the session file in Finder (macOS). Used by the sidebar menu."""
+    if not _SAFE_ID.fullmatch(session_id):
+        raise HTTPException(status_code=400, detail="Invalid session id")
+    path = store.session_file(session_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Session file not found")
+    if sys.platform != "darwin":
+        raise HTTPException(status_code=501, detail="Reveal in Finder is only available on macOS")
+    subprocess.run(["open", "-R", str(path)], check=False)
+    return {"status": "ok", "path": str(path)}
+

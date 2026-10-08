@@ -17,6 +17,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { buildPreview, isWriteTool, PreviewRegistry } from "./src/preview.js";
 import { toPromptInput } from "./src/content.js";
+import { resolveSessionCwd } from "./src/cwd.js";
 import { pickModelForImages, supportsImages } from "./src/vision.js";
 
 // Pi CLI does this at startup: forces HTTP/1.1 (allowH2: false).
@@ -129,7 +130,9 @@ app.use(express.json({ limit: "20mb" }));
 
 app.post("/chat", async (req, res) => {
   console.log(`[bridge] POST /chat body:`, JSON.stringify(req.body)?.slice(0, 200));
-  const { messages, model: rawModel } = req.body;
+  const { messages, model: rawModel, rules } = req.body as { messages: unknown; model: string; rules?: string; cwd?: string };
+  // The selected project folder: tools and rules are scoped to it
+  const sessionCwd = resolveSessionCwd(req.body.cwd, process.cwd());
   // Resolve provider alias (e.g. "pi" → "anthropic")
   const rawProvider: string = req.body.provider ?? "anthropic";
   const provider = PROVIDER_ALIAS[rawProvider] ?? rawProvider;
@@ -198,15 +201,19 @@ app.post("/chat", async (req, res) => {
   try {
     console.log(`[bridge] createAgentSession...`);
     let resourceLoader: DefaultResourceLoader | undefined;
-    if (previewCtrl.enabled) {
+    // The loader carries the execution-preview extension and the project rules
+    if (previewCtrl.enabled || rules) {
       resourceLoader = new DefaultResourceLoader({
-        cwd: process.cwd(),
+        cwd: sessionCwd,
         agentDir: getAgentDir(),
-        extensionFactories: [makePreviewExtension(previewCtrl)],
+        extensionFactories: previewCtrl.enabled ? [makePreviewExtension(previewCtrl)] : [],
+        // Project and global rules, injected into the system prompt
+        appendSystemPrompt: rules ? [rules] : undefined,
       });
       await resourceLoader.reload();
     }
     const result = await createAgentSession({
+      cwd: sessionCwd,
       sessionManager: SessionManager.inMemory(),
       modelRuntime: runtime,
       // Image questions are answered directly; tools would only add a detour and an approval wait

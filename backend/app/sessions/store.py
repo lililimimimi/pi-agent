@@ -212,6 +212,14 @@ def list_sessions() -> list[SessionSummary]:
     return summaries
 
 
+def session_file(session_id: str) -> Path | None:
+    """Path of the session file on disk, in our format or Pi's native layout."""
+    own = _sessions_dir() / f"{session_id}.jsonl"
+    if own.exists():
+        return own
+    return _find_pi_native_session(session_id)
+
+
 def get_session(session_id: str) -> list[dict]:
     """Read all records from a session file. Returns list of raw dicts.
 
@@ -333,3 +341,40 @@ def delete_project(project_id: str) -> None:
     if len(filtered) == len(projects):
         raise FileNotFoundError(f"Project '{project_id}' not found")
     _save_projects(filtered)
+
+
+def _project_of_file(path: Path) -> str:
+    """Project path recorded in a session file's meta line ('' if unreadable)."""
+    try:
+        with path.open(encoding="utf-8") as fh:
+            meta = json.loads(fh.readline() or "{}")
+    except (OSError, json.JSONDecodeError):
+        return ""
+    return meta.get("project_id", "") or ""
+
+
+def delete_project_sessions(project_path: str) -> int:
+    """Delete every session that belongs to a project folder.
+
+    Covers our own files (project_id = path) and Pi's per-folder directory
+    (--<path with / as ->--). Returns the number of session files removed.
+    """
+    if not project_path:
+        return 0
+    d = _sessions_dir()
+    removed = 0
+    for f in d.glob("*.jsonl"):
+        if _project_of_file(f) == project_path:
+            f.unlink()
+            removed += 1
+    native_dir = d / ("--" + project_path.strip("/").replace("/", "-") + "--")
+    if native_dir.is_dir():
+        for f in native_dir.glob("*.jsonl"):
+            f.unlink()
+            removed += 1
+        try:
+            native_dir.rmdir()  # only removes it when empty
+        except OSError:
+            pass
+    return removed
+

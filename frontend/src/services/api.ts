@@ -14,11 +14,13 @@ export async function createChat(
   provider = 'mock',
   model = 'mock-1',
   persistId?: string,
+  projectPath?: string,
 ): Promise<{ session_id: string; persist_id: string }> {
   const res = await fetch(`${BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, provider, model, persist_id: persistId ?? '' }),
+    // project_path lets the backend add that project's rules to the prompt
+    body: JSON.stringify({ messages, provider, model, persist_id: persistId ?? '', project_path: projectPath ?? '' }),
   })
   if (!res.ok) throw new Error(`Failed to create chat: ${res.status}`)
   return await res.json()
@@ -243,9 +245,19 @@ export async function createProjectApi(path: string, name?: string): Promise<Pro
   return await res.json()
 }
 
-export async function deleteProjectApi(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/projects/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error(`Failed to delete project: ${res.status}`)
+export async function deleteProjectApi(
+  id: string,
+  options: { deleteSessions?: boolean; deleteFolder?: boolean } = {},
+): Promise<void> {
+  const params = new URLSearchParams()
+  if (options.deleteSessions) params.set('delete_sessions', 'true')
+  if (options.deleteFolder) params.set('delete_folder', 'true')
+  const query = params.toString() ? `?${params}` : ''
+  const res = await fetch(`${BASE}/projects/${id}${query}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => null)
+    throw new Error(data?.detail || `Failed to delete project: ${res.status}`)
+  }
 }
 
 // ── Filesystem Browse ─────────────────────────────────────────
@@ -322,4 +334,16 @@ export async function fetchFileContent(root: string, path: string): Promise<File
   const res = await fetch(`${BASE}/files/content?${params}`)
   if (!res.ok) throw new Error(await errorMessage(res, 'Failed to read file'))
   return await res.json()
+}
+
+/** Selects the session's file in Finder (macOS only). */
+export async function revealSessionFile(sessionId: string): Promise<void> {
+  const res = await fetch(`${BASE}/sessions/${encodeURIComponent(sessionId)}/reveal`, { method: 'POST' })
+  if (!res.ok) throw new Error(await errorMessage(res, 'Could not reveal session file'))
+}
+
+/** Opens the project folder in Finder (macOS only). */
+export async function revealProjectFolder(projectId: string): Promise<void> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/reveal`, { method: 'POST' })
+  if (!res.ok) throw new Error(await errorMessage(res, 'Could not open the folder'))
 }

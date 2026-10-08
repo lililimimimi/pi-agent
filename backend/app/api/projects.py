@@ -9,6 +9,8 @@ DELETE /api/projects/:id      → delete a project
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -95,8 +97,55 @@ async def get_project(project_id: str):
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
+def _move_to_trash(target: Path) -> None:
+    """Move a folder to the Trash through Finder, so it can be recovered."""
+    if sys.platform != "darwin":
+        raise HTTPException(status_code=501, detail="Moving to Trash is only supported on macOS")
+    escaped = str(target).replace("\\", "\\\\").replace('"', '\\"')
+    script = f'tell application "Finder" to delete POSIX file "{escaped}"'
+    try:
+        subprocess.run(["osascript", "-e", script], check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        detail = (e.stderr or "").strip() or "Finder could not move the folder"
+        raise HTTPException(status_code=500, detail=f"Could not move folder to Trash: {detail}") from e
+
+
+def _remove_project_folder(path_str: str) -> None:
+    """Move the project's folder to the Trash. Refuses home and its ancestors."""
+    if not path_str:
+        return
+    target = Path(path_str).expanduser().resolve()
+    home = Path.home().resolve()
+    if target == home or target in home.parents or target.parent == target:
+        raise HTTPException(status_code=400, detail=f"Refusing to delete {target}")
+    if not target.exists():
+        return
+    if not target.is_dir():
+        raise HTTPException(status_code=400, detail=f"Not a folder: {target}")
+    _move_to_trash(target)
+
+
+@router.post("/{project_id}/reveal")
+async def reveal_project_folder(project_id: str) -> dict[str, str]:
+    """Open the project's folder in Finder (macOS). Read-only."""
+    if project_id.startswith("pi-native:"):
+        raw_path = project_id[len("pi-native:"):]
+    else:
+        try:
+            raw_path = store.get_project(project_id).path
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+    folder = Path(raw_path).expanduser() if raw_path else None
+    if folder is None or not folder.is_dir():
+        raise HTTPException(status_code=404, detail="Project folder not found")
+    if sys.platform != "darwin":
+        raise HTTPException(status_code=501, detail="Show in Finder is only available on macOS")
+    subprocess.run(["open", str(folder.resolve())], check=False)
+    return {"status": "ok", "path": str(folder.resolve())}
+
+
 @router.delete("/{project_id}")
-async def delete_project(project_id: str):
+async def delete_project(project_id: str, delete_sessions: bool = False, delete_folder: bool = False):
     # Pi-native project: just add to ignored list so it doesn't reappear
     if project_id.startswith("pi-native:"):
         path = project_id[len("pi-native:"):]
@@ -107,12 +156,19 @@ async def delete_project(project_id: str):
     # Regular project: remove from projects.json AND ignore its path from auto-detect
     try:
         project = store.get_project(project_id)
-        store.delete_project(project_id)
-        # Prevent auto-detect from re-adding it on next load
-        if project.path:
-            ignored = _load_ignored()
-            ignored.add(project.path)
-            _save_ignored(ignored)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-    return {"status": "ok"}
+
+    # Folder first: if it cannot be removed, the project stays listed
+    if delete_folder:
+        _remove_project_folder(project.path)
+
+    store.delete_project(project_id)
+    # Prevent auto-detect from re-adding it on next load
+    if project.path:
+        ignored = _load_ignored()
+        ignored.add(project.path)
+        _save_ignored(ignored)
+
+    deleted = store.delete_project_sessions(project.path) if delete_sessions else 0
+    return {"status": "ok", "deleted_sessions": deleted, "folder_deleted": delete_folder}

@@ -6,8 +6,11 @@ import { useFileBrowserStore } from '@/stores/fileBrowserStore'
 import { useLayoutStore, clampSidebarWidth } from '@/stores/layoutStore'
 import {
   Plus, Settings, MessageSquare, Folder, FolderOpen,
-  MoreHorizontal, Pencil, Trash2, Check, FolderPlus, Search,
+  MoreHorizontal, Pencil, Trash2, Check, FolderPlus, Search, FolderOpen as RevealIcon,
 } from 'lucide-react'
+import { revealSessionFile, revealProjectFolder } from '@/services/api'
+import { useToast } from '@/components/Toast'
+import { DeleteProjectDialog } from '@/components/DeleteProjectDialog'
 
 type SidebarProps = {
   onSettingsClick?: () => void
@@ -52,7 +55,7 @@ function SessionRow({
   selected,
   onToggle,
 }: {
-  session: { id: string; title: string }
+  session: { id: string; title: string; persistId?: string | null }
   isActive: boolean
   editMode: boolean
   selected: boolean
@@ -61,6 +64,7 @@ function SessionRow({
   const switchSession = useChatStore((s) => s.switchSession)
   const renameSession = useChatStore((s) => s.renameSession)
   const deleteSession = useChatStore((s) => s.deleteSession)
+  const { showToast } = useToast()
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
@@ -139,6 +143,21 @@ function SessionRow({
             <Pencil className="h-3.5 w-3.5" strokeWidth={1.8} />
             Rename
           </button>
+          {session.persistId && (
+            <button
+              className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-accent transition-colors text-foreground/80"
+              onClick={(e) => {
+                e.stopPropagation()
+                setMenuOpen(false)
+                revealSessionFile(session.persistId!).catch((err: Error) =>
+                  showToast({ type: 'error', message: err.message }),
+                )
+              }}
+            >
+              <RevealIcon className="h-3.5 w-3.5" strokeWidth={1.8} />
+              Show in Finder
+            </button>
+          )}
           <button
             className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-destructive/10 text-destructive transition-colors"
             onClick={(e) => { e.stopPropagation(); setMenuOpen(false); deleteSession(session.id) }}
@@ -153,10 +172,13 @@ function SessionRow({
 }
 
 // ── Project row ───────────────────────────────────────────────────────────────
-function ProjectRow({ project, isActive }: { project: { id: string; name: string }; isActive: boolean }) {
+function ProjectRow({ project, isActive }: { project: { id: string; name: string; path?: string }; isActive: boolean }) {
   const switchProject = useChatStore((s) => s.switchProject)
   const renameProject = useChatStore((s) => s.renameProject)
   const deleteProject = useChatStore((s) => s.deleteProject)
+  const { showToast } = useToast()
+  const sessionCountFor = (id: string) => useChatStore.getState().sessions.filter((x) => x.projectId === id).length
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const projects = useChatStore((s) => s.projects)
 
   const [menuOpen, setMenuOpen] = useState(false)
@@ -175,6 +197,7 @@ function ProjectRow({ project, isActive }: { project: { id: string; name: string
   const Icon = isActive ? FolderOpen : Folder
 
   return (
+    <>
     <div
       className={`group/proj relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm cursor-pointer transition-colors ${
         isActive ? 'bg-white shadow-sm text-foreground font-medium' : 'text-foreground/60 hover:bg-black/[0.06]'
@@ -217,10 +240,21 @@ function ProjectRow({ project, isActive }: { project: { id: string; name: string
             <Pencil className="h-3.5 w-3.5" strokeWidth={1.8} />
             Rename
           </button>
+          <button
+            className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-accent transition-colors text-foreground/80"
+            onClick={(e) => {
+              e.stopPropagation()
+              setMenuOpen(false)
+              revealProjectFolder(project.id).catch((err: Error) => showToast({ type: 'error', message: err.message }))
+            }}
+          >
+            <RevealIcon className="h-3.5 w-3.5" strokeWidth={1.8} />
+            Show in Finder
+          </button>
           {projects.length > 1 && (
             <button
               className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-destructive/10 text-destructive transition-colors"
-              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); deleteProject(project.id) }}
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setConfirmingDelete(true) }}
             >
               <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} />
               Delete
@@ -229,6 +263,19 @@ function ProjectRow({ project, isActive }: { project: { id: string; name: string
         </div>
       )}
     </div>
+    {confirmingDelete && (
+      <DeleteProjectDialog
+        projectName={project.name}
+        folderPath={project.path ?? ''}
+        sessionCount={sessionCountFor(project.id)}
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={(deleteFolder) => {
+          setConfirmingDelete(false)
+          deleteProject(project.id, deleteFolder)
+        }}
+      />
+    )}
+    </>
   )
 }
 

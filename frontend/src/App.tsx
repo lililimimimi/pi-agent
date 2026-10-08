@@ -36,6 +36,7 @@ export function App() {
   const initProvider = useChatStore((s) => s.initProvider)
   const loadPersistedSessions = useChatStore((s) => s.loadPersistedSessions)
   const loadPersistedProjects = useChatStore((s) => s.loadPersistedProjects)
+  const restoreLastView = useChatStore((s) => s.restoreLastView)
   const messages = useChatStore((s) => s.messages)
   const newSession = useChatStore((s) => s.newSession)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -63,13 +64,14 @@ export function App() {
   useKeyboardShortcuts(shortcutHandlers)
 
   useEffect(() => {
-    // 先加载 projects（包含 path），再加载 sessions（需要 path 匹配）
+    // 先加载 projects（包含 path），再加载 sessions（需要 path 匹配），最后回到上次打开的位置
     const init = async () => {
       await Promise.all([initProvider(), loadPersistedProjects()])
       await loadPersistedSessions()
+      await restoreLastView()
     }
     init()
-  }, [initProvider, loadPersistedSessions, loadPersistedProjects])
+  }, [initProvider, loadPersistedSessions, loadPersistedProjects, restoreLastView])
 
   // ⌘B — toggle sidebar
   useEffect(() => {

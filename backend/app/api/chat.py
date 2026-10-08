@@ -29,6 +29,7 @@ from app.types import (
 )
 from app.sessions import store as session_store
 from app.sessions.models import MessageRecord
+from app.rules.engine import RulesEngine
 
 BRIDGE_URL = os.getenv("PI_BRIDGE_URL", "http://localhost:3100")
 
@@ -43,12 +44,16 @@ class _Session:
         model: str,
         persist_id: str = "",
         execution_preview: bool = True,
+        rules: str = "",
+        project_path: str = "",
     ) -> None:
         self.messages = messages
         self.provider = provider
         self.model = model
         self.persist_id = persist_id
         self.execution_preview = execution_preview
+        self.rules = rules
+        self.project_path = project_path
         self.approval_events: dict[str, asyncio.Event] = {}
         self.approval_results: dict[str, bool] = {}
 
@@ -123,6 +128,7 @@ class ChatRequest(BaseModel):
     model: str = "mock-1"
     persist_id: str = ""
     execution_preview: bool = True
+    project_path: str = ""
 
 
 @router.post("/chat")
@@ -137,7 +143,8 @@ async def create_chat(req: ChatRequest) -> dict[str, str]:
     if not persist_id:
         first_content = next((text_of(m.content) for m in messages if m.role == Role.USER), "")
         title = first_content[:20].strip() if first_content else ""
-        meta = session_store.create_session(title=title)
+        # Store the project folder so the session reopens under the same project
+        meta = session_store.create_session(title=title, project_id=req.project_path)
         persist_id = meta.id
 
     for m in messages:
@@ -151,12 +158,20 @@ async def create_chat(req: ChatRequest) -> dict[str, str]:
         except FileNotFoundError:
             pass
 
+    try:
+        rules = RulesEngine().build_rules(req.project_path)
+    except OSError as exc:  # rules are optional; never block the chat on them
+        print(f"[chat] could not build rules: {exc}")
+        rules = ""
+
     _sessions[session_id] = _Session(
         messages=messages,
         provider=req.provider,
         model=req.model,
         persist_id=persist_id,
         execution_preview=req.execution_preview,
+        rules=rules,
+        project_path=req.project_path,
     )
     return {"session_id": session_id, "persist_id": persist_id}
 
@@ -180,6 +195,8 @@ async def stream_chat(session_id: str) -> StreamingResponse:
                     "provider": session.provider,
                     "model": session.model,
                     "execution_preview": session.execution_preview,
+                    "rules": session.rules,
+                    "cwd": session.project_path,
                 },
             ) as resp:
                 if resp.status_code != 200:
