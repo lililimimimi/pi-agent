@@ -87,6 +87,7 @@ async def test_stream_returns_text_and_done(client: AsyncClient):
             yield line
 
     mock_resp = AsyncMock()
+    mock_resp.status_code = 200
     mock_resp.aiter_lines = _fake_aiter_lines
 
     mock_client_instance = AsyncMock()
@@ -132,6 +133,7 @@ async def test_stream_text_content_matches_proxy(client: AsyncClient):
             yield line
 
     mock_resp = AsyncMock()
+    mock_resp.status_code = 200
     mock_resp.aiter_lines = _fake_aiter_lines
 
     mock_client_instance = AsyncMock()
@@ -214,6 +216,7 @@ async def test_stream_bridge_error_is_proxied(client: AsyncClient):
             yield line
 
     mock_resp = AsyncMock()
+    mock_resp.status_code = 200
     mock_resp.aiter_lines = _fake_aiter_lines
 
     mock_client_instance = AsyncMock()
