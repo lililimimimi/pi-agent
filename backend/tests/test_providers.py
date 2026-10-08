@@ -2,7 +2,7 @@
 Tests for provider configuration and provider API endpoints.
 
 Coverage:
-- config/providers.py: load/save, mask_key, all_providers_masked, get_all_enabled_models
+- config/providers.py: load/save, mask_key, all_providers_masked
 - api/providers.py: GET /api/providers, PUT /api/providers/:id,
                     POST /api/providers/:id/test, GET /api/providers/:id/models
 """
@@ -120,54 +120,6 @@ def test_all_providers_masked_returns_all_five(tmp_path: Path, monkeypatch):
     result = all_providers_masked()
     ids = {p["id"] for p in result}
     assert ids == set(PROVIDER_IDS)
-
-
-def test_get_all_enabled_models(tmp_path: Path, monkeypatch):
-    from app.config import providers as pmod
-
-    cfg_file = tmp_path / ".pi" / "agent" / "config.json"
-    monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
-
-    from app.config.providers import update_provider_config, get_all_enabled_models
-
-    update_provider_config("anthropic", {
-        "api_key": "sk-ant-xxx",
-        "enabled": True,
-        "connected": True,
-        "models": ["claude-opus-4-5", "claude-sonnet-4-5"],
-    })
-
-    models = get_all_enabled_models()
-    model_ids = [m["id"] for m in models]
-    assert "claude-opus-4-5" in model_ids
-    assert "claude-sonnet-4-5" in model_ids
-    assert all(m["provider"] == "anthropic" for m in models)
-
-
-def test_get_all_enabled_models_skips_disconnected(tmp_path: Path, monkeypatch):
-    from app.config import providers as pmod
-
-    cfg_file = tmp_path / ".pi" / "agent" / "config.json"
-    monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
-
-    from app.config.providers import update_provider_config, get_all_enabled_models
-
-    # enabled but not connected → should not appear
-    update_provider_config("openai", {
-        "api_key": "sk-openai-xxx",
-        "enabled": True,
-        "connected": False,
-        "models": ["gpt-4o"],
-    })
-
-    models = get_all_enabled_models()
-    providers = [m["provider"] for m in models]
-    assert "openai" not in providers
-
-
-# ---------------------------------------------------------------------------
-# API endpoint tests
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture()

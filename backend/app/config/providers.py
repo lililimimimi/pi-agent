@@ -282,28 +282,3 @@ def all_providers_masked() -> list[dict[str, Any]]:
             "custom":      True,
         })
     return result
-
-
-def get_all_enabled_models() -> list[dict[str, Any]]:
-    """Return cached models for all enabled+connected providers.
-    Used by GET /api/models to enrich the model list."""
-    cfg = load_config()
-    result = []
-    for pid, p in cfg["providers"].items():
-        if p.get("enabled") and p.get("connected") and p.get("models"):
-            for m in p["models"]:
-                if isinstance(m, str):
-                    result.append({
-                        "id": m,
-                        "name": m,
-                        "provider": pid,
-                        "supports_tools": True,
-                    })
-                elif isinstance(m, dict):
-                    result.append({
-                        "id":             m.get("id", ""),
-                        "name":           m.get("name", m.get("id", "")),
-                        "provider":       pid,
-                        "supports_tools": m.get("supports_tools", True),
-                    })
-    return result

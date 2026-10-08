@@ -1,43 +1,13 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class Role(str, Enum):
     USER = "user"
     ASSISTANT = "assistant"
     TOOL = "tool"
-
-
-# ── Model output chunks ────────────────────────────────────────────────────────
-
-class TextChunk(BaseModel):
-    type: str = Field(default="text", frozen=True)
-    content: str
-
-
-class ToolCallChunk(BaseModel):
-    type: str = Field(default="tool_call", frozen=True)
-    tool_call_id: str
-    tool_name: str
-    arguments: dict[str, Any]
-
-
-# ── Tool primitives ────────────────────────────────────────────────────────────
-
-class ToolCall(BaseModel):
-    tool_call_id: str
-    tool_name: str
-    arguments: dict[str, Any]
-
-
-class ToolResult(BaseModel):
-    tool_call_id: str
-    output: str
-    is_error: bool = False
 
 
 # ── Multimodal content ─────────────────────────────────────────────────────────
@@ -64,8 +34,6 @@ class Message(BaseModel):
     role: Role
     # Plain string for text-only messages; list of parts when images are attached
     content: str | list[MessageContent] = ""
-    tool_calls: list[ToolCall] | None = None
-    tool_results: list[ToolResult] | None = None
 
 
 def text_of(content: str | list[MessageContent]) -> str:
@@ -80,23 +48,3 @@ def images_of(content: str | list[MessageContent]) -> list[ImageContent]:
     if isinstance(content, str):
         return []
     return [part.image for part in content if part.type == "image" and part.image is not None]
-
-
-# ── SSE event envelope ─────────────────────────────────────────────────────────
-
-class SSEEvent(BaseModel):
-    event: str
-    data: dict[str, Any]
-
-
-class PermissionRequestEvent(BaseModel):
-    """SSE event emitted when a dangerous tool needs user approval."""
-    event: str = Field(default="permission_request", frozen=True)
-    data: dict[str, Any]  # tool_call_id, tool_name, arguments
-
-
-class ExecutionPreviewEvent(BaseModel):
-    """SSE event emitted before the first write tool call, so the user can
-    confirm the agent's intended steps before anything is modified."""
-    event: str = Field(default="execution_preview", frozen=True)
-    data: dict[str, Any]  # preview_id, steps, has_write_ops

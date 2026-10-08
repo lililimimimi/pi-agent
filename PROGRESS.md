@@ -175,10 +175,29 @@
 | React Hook Form | 暂不采用 | 表单字段少，`useState` 足够 |
 | `features/` 目录 | 暂不重组 | 文件还不多；新的大功能再开子目录 |
 
+## 今日改动（设置与模型管理，模块 17 之后）
+
+| 类别 | 内容 |
+|------|------|
+| 模型选择 | 设置里按 provider 开关模型，右上角只显示已开启的模型；选中的模型未开启时自动切换 |
+| 测试 | 每个模型可单独测试，结果保存在 config.json；绿点/红点 |
+| 订阅登录 | ChatGPT（openai-codex）与 Claude.ai（pi）：应用内登录、登出（bridge 的 `/auth/*`） |
+| 自定义供应商 | 底部「Add provider」，填名称、地址、Key；保存后拉取模型；可 Remove |
+| SiliconFlow | bridge 注册为 OpenAI 兼容 provider（`custom-providers.ts`） |
+| API Key | bridge 读取设置里保存的 DeepSeek / OpenAI / Anthropic Key |
+| 工作目录 | 项目对话用项目文件夹；General 用主目录；顶部显示当前目录 |
+| 架构 | Zod 校验 API 边界（`lib/schemas.ts`）；按上面的「架构决策」执行 |
+| 清理 | 删除 Python 端 agent 相关类型（`app/types.py`）与 `get_all_enabled_models` |
+
+**已验证**：浏览器中的界面检查（你已完成）。
+
 ## 当前问题
 
-无
+- **README.md** 暂时保持空白（提交 `aac08ea`），等项目全部完成后再编写。
+- **未推送**：本地 `main` 领先 `origin/main` 4 个提交，待推送。
+- **Test all** 按钮：已提议，暂未实现。
+- **模块 17**：日志格式需要你在本地确认后再算完成。
 
 ## 下一步
 
-等待用户审核模块 17，之后从 `docs/plans/18-tauri.md` 开始。
+暂不开始新功能。先决定 README 与推送；然后开始模块 18（`docs/plans/18-tauri.md`）。
