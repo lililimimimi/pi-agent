@@ -39,13 +39,13 @@ class MessageContent(BaseModel):
 
 ## 步骤
 
-- [ ] 扩展 `types.py`（ImageContent + MessageContent）
-- [ ] 更新 `claude.py` 的 `_convert_messages()`
-- [ ] 更新 `api/chat.py`（接受 image 字段）
-- [ ] 更新 `InputBar.tsx`（文件选择 + 预览 + 移除）
-- [ ] 更新 `MessageBubble.tsx`（渲染已发送图片）
-- [ ] 写测试（mock Claude API，验证 image block 格式正确）
-- [ ] `pytest tests/test_claude_provider.py -v` → 通过
+- [x] 扩展 `types.py`（ImageContent + MessageContent）
+- [x] 更新 `claude.py` 的 `_convert_messages()`
+- [x] 更新 `api/chat.py`（接受 image 字段）
+- [x] 更新 `InputBar.tsx`（文件选择 + 预览 + 移除）
+- [x] 更新 `MessageBubble.tsx`（渲染已发送图片；已有实现，本次复用）
+- [x] 写测试（mock Claude API，验证 image block 格式正确）
+- [x] `pytest tests/test_claude_provider.py -v` → 通过
 
 ## ⏸ 审核后继续
 
