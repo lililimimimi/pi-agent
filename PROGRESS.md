@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-### 已完成（模块 1–16）
+### 已完成（模块 1–17）
 
 - 基础规则、Agent Core、后端 FastAPI、前端 React 架构
 - 安全拦截、多模型路由、集成接线
@@ -13,6 +13,33 @@
 - **模型配置 + Provider 管理**：Settings 页面、Claude.ai 订阅直连、多 provider 支持
 - **前端体验增强**：代码块复制、Context 用量显示、全局 Toast、网络监控、快捷键
 - **执行前确认机制**：Agent 写操作前展示步骤预览卡片，用户确认/取消，60s 超时自动取消
+
+#### 精简：移除 Python 端的 Agent 与模型适配层
+
+聊天路径已统一走 pi-bridge（Pi SDK），Python 端的旧路径不再需要。
+
+| 删除 | 说明 |
+|------|------|
+| `app/agent/`（`AgentLoop`） | 旧 Python 循环，已由 bridge 替代 |
+| `app/models/`（base、claude、claude_oauth、deepseek） | 各家模型适配器，已由 Pi SDK 替代 |
+| `app/tools/`（读/写文件、git） | 旧 Python 工具，界面工具由 Pi SDK 提供 |
+| `app/container.py`、`app/security.py` | 仅为上面的旧路径服务 |
+| `tests/test_agent_core.py`、`test_claude_provider.py`、`test_deepseek_provider.py`、`test_security.py` | 对应删除的代码 |
+
+`main.py` 只保留日志、CORS 和路由；`test_integration.py` 去掉了注册表夹具，保留的测试不变。
+结果：backend 131/131 ✅，界面行为不变。
+
+#### 模块 17 具体交付
+
+| 类别 | 内容 |
+|------|------|
+| `app/logging.py` | `LogContext`（进入时设置 correlation ID，退出时恢复）、`get_logger(name)`（每行带模块名和 cid）、`setup_logging(level)`；格式：`时间 \| 级别 \| 模块 \| cid=… \| 消息` |
+| 注入点 | `api/chat.py`：创建和流式请求都记录，并把 cid 传给 bridge；`agent/core.py`：循环开始/结束、工具调用；`models/claude.py`：请求摘要（只记数量，不记内容）；`tools/*.py`：每次执行 |
+| bridge | `server.ts` 接收 `cid`，打印在 `/chat` 的日志行里，可与后端日志串起来；不再打印完整消息内容 |
+| 测试 | `test_logging.py` 6 个：ID 隔离、嵌套恢复、并发任务互不影响、日志格式 |
+| 测试结果 | backend 174/174 ✅（无警告），bridge 34/34 ✅ |
+| 注入点（现状） | chat API 和 bridge 有日志；`agent/core.py`、`claude.py`、`tools/` 的注入点随 Python Agent 精简一并删除 |
+| 待确认 | 启动后发一条消息，观察日志格式；审核通过后提交（模块 17 尚未提交） |
 
 #### 模块 16 具体交付
 
@@ -126,13 +153,27 @@
 | Google Gemini | `GEMINI_API_KEY` | ✅ |
 | Ollama | Base URL（本地，无需 key）| ✅ |
 
-### 待完成（模块 17–19）
+### 待完成（模块 18–19）
+
+> 模块 17 已实现，等待你在本地确认日志格式并审核，之后再提交。
 
 | 模块 | 文件 | 内容 |
 |------|------|------|
-| 17 | 17-trace.md | 日志追踪 |
 | 18 | 18-tauri.md | Tauri 桌面打包 |
 | 19 | 19-docker.md | Docker 容器隔离（备用） |
+
+## 架构决策（前端，轻量方案）
+
+`.pi/skills/react-typescript` 的规范是给大项目准备的。这里只采用适合当前规模的部分：
+
+| 规范条目 | 决定 | 原因 |
+|---------|------|------|
+| Zod 校验 API 边界 | 采用：`src/lib/schemas.ts`，覆盖模型、目录、provider、测试结果 | 后端字段变化时尽早报错，体积小 |
+| `cn()` + shadcn 组件 | 新代码采用，老代码不批量改 | 避免大规模改动 |
+| Zustand | 保留 | 已经够用 |
+| TanStack Query | 暂不采用 | 只有在服务端数据重复存放造成问题时再考虑 |
+| React Hook Form | 暂不采用 | 表单字段少，`useState` 足够 |
+| `features/` 目录 | 暂不重组 | 文件还不多；新的大功能再开子目录 |
 
 ## 当前问题
 
@@ -140,4 +181,4 @@
 
 ## 下一步
 
-等待用户审核模块 16，之后从 `docs/plans/17-trace.md` 开始。
+等待用户审核模块 17，之后从 `docs/plans/18-tauri.md` 开始。
