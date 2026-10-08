@@ -41,14 +41,14 @@ describe("extractSteps", () => {
 
 describe("describeToolCall", () => {
   it("describes a write tool call with a path", () => {
-    assert.equal(describeToolCall("edit", { path: "main.py" }), "修改 main.py");
-    assert.equal(describeToolCall("write", { file_path: "a.txt" }), "写入 a.txt");
+    assert.equal(describeToolCall("edit", { path: "main.py" }), "Edit main.py");
+    assert.equal(describeToolCall("write", { file_path: "a.txt" }), "Write a.txt");
   });
 
   it("describes a bash command, truncating long ones", () => {
-    assert.equal(describeToolCall("bash", { command: "pytest -q" }), "运行 pytest -q");
+    assert.equal(describeToolCall("bash", { command: "pytest -q" }), "Run pytest -q");
     const long = "x".repeat(80);
-    assert.equal(describeToolCall("bash", { command: long }), `运行 ${"x".repeat(60)}…`);
+    assert.equal(describeToolCall("bash", { command: long }), `Run ${"x".repeat(60)}…`);
   });
 });
 
@@ -64,7 +64,7 @@ describe("buildPreview", () => {
 
   it("falls back to describing the pending tool call", () => {
     const steps = buildPreview({ assistantText: "no list here", toolName: "write", args: { path: "x.ts" } });
-    assert.deepEqual(steps, ["写入 x.ts"]);
+    assert.deepEqual(steps, ["Write x.ts"]);
   });
 
   it("caps the number of steps", () => {

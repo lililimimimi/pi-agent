@@ -36,25 +36,25 @@ export function describeToolCall(toolName: string, args: ToolArgs = {}): string 
   const path = str(args.path) ?? str(args.file_path) ?? str(args.filePath);
   switch (toolName) {
     case "read":
-      return path ? `读取 ${path}` : "读取文件";
+      return path ? `Read ${path}` : "Read file";
     case "write":
-      return path ? `写入 ${path}` : "写入文件";
+      return path ? `Write ${path}` : "Write file";
     case "edit":
-      return path ? `修改 ${path}` : "修改文件";
+      return path ? `Edit ${path}` : "Edit file";
     case "bash":
     case "powershell": {
       const command = str(args.command) ?? "";
       const short = command.length > 60 ? `${command.slice(0, 60)}…` : command;
-      return short ? `运行 ${short}` : "运行命令";
+      return short ? `Run ${short}` : "Run command";
     }
     case "grep":
-      return "搜索代码";
+      return "Search code";
     case "find":
-      return "查找文件";
+      return "Find files";
     case "ls":
-      return path ? `列出 ${path}` : "列出目录";
+      return path ? `List ${path}` : "List directory";
     default:
-      return `调用 ${toolName}`;
+      return `Call ${toolName}`;
   }
 }
 

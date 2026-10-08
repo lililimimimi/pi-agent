@@ -1,11 +1,14 @@
 import crypto from "node:crypto";
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import * as dotenv from "dotenv";
 import express from "express";
 
 // 加载后端 .env（bridge 和 backend 在同一项目根目录下）
+// Working folder for chats without a project (the General project): the home folder.
+const HOME_DIR = homedir();
 const envPath = resolve(fileURLToPath(import.meta.url), "../../backend/.env");
 dotenv.config({ path: envPath });
 import {
@@ -18,6 +21,8 @@ import {
 import { buildPreview, isWriteTool, PreviewRegistry } from "./src/preview.js";
 import { toPromptInput } from "./src/content.js";
 import { resolveSessionCwd } from "./src/cwd.js";
+import { syncCustomProviders, syncBuiltinKeys } from "./src/custom-providers.js";
+import { startLogin, getLoginSession, clearLoginSession } from "./src/login.js";
 import { pickModelForImages, supportsImages } from "./src/vision.js";
 
 // Pi CLI does this at startup: forces HTTP/1.1 (allowH2: false).
@@ -65,6 +70,8 @@ async function getModelRuntime(provider: string): Promise<ModelRuntime> {
   if (!modelRuntimeInstance) {
     modelRuntimeInstance = await ModelRuntime.create();
   }
+  syncCustomProviders(modelRuntimeInstance);
+  await syncBuiltinKeys(modelRuntimeInstance);
   // Inject API key for the provider if available via env
   const keyEnv = PROVIDER_KEY_ENV[provider];
   if (keyEnv && process.env[keyEnv]) {
@@ -106,7 +113,7 @@ function makePreviewExtension(ctrl: PreviewController) {
 
       const decision = await previewRegistry.wait(previewId, {
         onTimeout: () => {
-          ctrl.send("text", { content: "\n\n> ⏱ 执行预览超时，已自动取消。\n" });
+          ctrl.send("text", { content: "\n\n> ⏱ Execution preview timed out and was cancelled.\n" });
         },
       });
 
@@ -117,7 +124,7 @@ function makePreviewExtension(ctrl: PreviewController) {
 
       ctrl.cancelled = true;
       if (decision === "cancel") {
-        ctrl.send("text", { content: "\n\n> ⏹ 已取消执行。\n" });
+        ctrl.send("text", { content: "\n\n> ⏹ Execution cancelled.\n" });
       }
       return { block: true, reason: "Execution cancelled at preview", terminate: true };
     });
@@ -129,10 +136,12 @@ export const app = express();
 app.use(express.json({ limit: "20mb" }));
 
 app.post("/chat", async (req, res) => {
-  console.log(`[bridge] POST /chat body:`, JSON.stringify(req.body)?.slice(0, 200));
+  // Correlation ID from the backend, so bridge logs join the same chain
+  const cid: string = typeof req.body?.cid === "string" ? req.body.cid : "-";
+  console.log(`[bridge] cid=${cid} POST /chat model=${req.body?.model} provider=${req.body?.provider}`);
   const { messages, model: rawModel, rules } = req.body as { messages: unknown; model: string; rules?: string; cwd?: string };
   // The selected project folder: tools and rules are scoped to it
-  const sessionCwd = resolveSessionCwd(req.body.cwd, process.cwd());
+  const sessionCwd = resolveSessionCwd(req.body.cwd, HOME_DIR);
   // Resolve provider alias (e.g. "pi" → "anthropic")
   const rawProvider: string = req.body.provider ?? "anthropic";
   const provider = PROVIDER_ALIAS[rawProvider] ?? rawProvider;
@@ -189,11 +198,11 @@ app.post("/chat", async (req, res) => {
   if (model && wantsImages && !supportsImages(model)) {
     const choice = pickModelForImages(model, await runtime.getAvailable());
     if (choice.kind === "switch") {
-      send("text", { content: `> 当前模型不支持图片，已自动切换到 ${choice.model.name} 处理图片。\n\n` });
+      send("text", { content: `> The current model cannot read images. Switched to ${choice.model.name} for this message.\n\n` });
       model = choice.model;
     } else {
       imagesDropped = true;
-      send("text", { content: "> 当前模型不支持图片，图片已忽略，仅根据文字回答。请切换到支持图片的模型。\n\n" });
+      send("text", { content: "> The current model cannot read images, so they were ignored. Pick a model that supports images.\n\n" });
     }
   }
 
@@ -315,6 +324,50 @@ app.post("/chat", async (req, res) => {
   req.on("close", cleanup);
 });
 
+// ── In-app login (OAuth providers such as the ChatGPT subscription) ──
+app.post("/auth/login", async (req, res) => {
+  const provider = typeof req.body?.provider === "string" ? req.body.provider : "";
+  if (!provider) {
+    res.status(400).json({ error: "provider is required" });
+    return;
+  }
+  try {
+    const runtime = await ensureRuntime();
+    const sdkId = PROVIDER_ALIAS[provider] ?? provider;
+    const session = startLogin(provider, (interaction) =>
+      runtime.login(sdkId, "oauth", { ...interaction, signal: new AbortController().signal }),
+    );
+    res.json({ status: session.status });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message ?? String(err) });
+  }
+});
+
+app.post("/auth/logout", async (req, res) => {
+  const provider = typeof req.body?.provider === "string" ? req.body.provider : "";
+  if (!provider) {
+    res.status(400).json({ error: "provider is required" });
+    return;
+  }
+  try {
+    const runtime = await ensureRuntime();
+    await runtime.logout(PROVIDER_ALIAS[provider] ?? provider);
+    clearLoginSession(provider);
+    res.json({ status: "ok" });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message ?? String(err) });
+  }
+});
+
+app.get("/auth/login/:provider", (req, res) => {
+  const session = getLoginSession(req.params.provider);
+  if (!session) {
+    res.json({ status: "idle", events: [] });
+    return;
+  }
+  res.json(session);
+});
+
 app.post("/approve", (_req, res) => {
   res.json({ status: "ok" });
 });
@@ -341,6 +394,8 @@ async function ensureRuntime(): Promise<ModelRuntime> {
   if (!modelRuntimeInstance) {
     modelRuntimeInstance = await ModelRuntime.create();
   }
+  syncCustomProviders(modelRuntimeInstance);
+  await syncBuiltinKeys(modelRuntimeInstance);
   // Inject all available API keys
   for (const [provider, envVar] of Object.entries(PROVIDER_KEY_ENV)) {
     if (process.env[envVar]) {
@@ -359,11 +414,57 @@ app.get("/models", async (_req, res) => {
       name: m.name,
       provider: m.provider,
       supports_tools: true,
+      supports_images: Array.isArray(m.input) && m.input.includes("image"),
     }));
     res.json(models);
   } catch (err) {
     console.error("[bridge] /models error:", err);
     res.json([]);
+  }
+});
+
+const MODEL_TEST_TIMEOUT_MS = 60_000;
+
+/**
+ * Checks that one model actually answers: a single short prompt, no tools,
+ * in-memory session (nothing is written to the session files).
+ */
+app.post("/models/test", async (req, res) => {
+  const rawProvider = req.body?.provider;
+  const rawModel = req.body?.model;
+  if (typeof rawProvider !== "string" || typeof rawModel !== "string") {
+    res.status(400).json({ ok: false, error: "provider and model are required" });
+    return;
+  }
+  const provider = PROVIDER_ALIAS[rawProvider] ?? rawProvider;
+  const modelId = MODEL_ALIASES[rawModel] ?? rawModel;
+  const started = Date.now();
+  let session: AgentSession | undefined;
+  try {
+    const runtime = await ensureRuntime();
+    const model = runtime.getModel(provider, modelId);
+    if (!model) {
+      res.json({ ok: false, error: "Model not found" });
+      return;
+    }
+    const result = await createAgentSession({
+      cwd: HOME_DIR,
+      sessionManager: SessionManager.inMemory(),
+      modelRuntime: runtime,
+      tools: [],
+      model,
+    });
+    session = result.session;
+    await Promise.race([
+      session.prompt("Reply with the single word: ok"),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out")), MODEL_TEST_TIMEOUT_MS)),
+    ]);
+    res.json({ ok: true, ms: Date.now() - started });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.json({ ok: false, error: message, ms: Date.now() - started });
+  } finally {
+    session?.dispose();
   }
 });
 
