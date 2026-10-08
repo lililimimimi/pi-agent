@@ -109,7 +109,8 @@ def _find_pi_native_session(session_id: str) -> Path | None:
             continue
         for f in subdir.glob("*.jsonl"):
             try:
-                first_line = f.open(encoding="utf-8").readline().strip()
+                with f.open(encoding="utf-8") as fh:
+                    first_line = fh.readline().strip()
                 if not first_line:
                     continue
                 meta = json.loads(first_line)
@@ -179,7 +180,8 @@ def list_sessions() -> list[SessionSummary]:
     # Our own sessions
     for f in d.glob("*.jsonl"):
         try:
-            first_line = f.open(encoding="utf-8").readline().strip()
+            with f.open(encoding="utf-8") as fh:
+                first_line = fh.readline().strip()
             if not first_line:
                 continue
             meta = json.loads(first_line)
