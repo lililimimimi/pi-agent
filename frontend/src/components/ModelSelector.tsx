@@ -1,25 +1,29 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useChatStore } from '@/stores/chatStore'
-import { fetchModels } from '@/services/api'
-import { ChevronDown } from 'lucide-react'
+import { fetchModels, type ModelTestStatus } from '@/services/api'
+import { ChevronDown, Image as ImageIcon } from 'lucide-react'
+
+// The picker shows only the models enabled in Settings → Providers.
 
 type ModelInfo = {
   id: string
   name: string
   provider: string
+  supports_images?: boolean
+  status?: ModelTestStatus | null
 }
 
 /** Short display name shown in the selector button badge */
 const PROVIDER_DISPLAY: Record<string, string> = {
-  pi:          'Claude.ai',   // OAuth subscription
-  claude:      'Anthropic',
-  anthropic:   'Anthropic',
-  deepseek:    'DeepSeek',
-  openai:      'OpenAI',
-  gemini:      'Gemini',
-  siliconflow: 'Silicon',
-  ollama:      'Ollama',
-  mock:        'Local',
+  pi: 'Claude.ai',
+  claude: 'Anthropic',
+  anthropic: 'Anthropic',
+  deepseek: 'DeepSeek',
+  openai: 'OpenAI',
+  gemini: 'Gemini',
+  siliconflow: 'SiliconFlow',
+  ollama: 'Ollama',
+  mock: 'Local',
 }
 
 export function ModelSelector() {
@@ -28,14 +32,32 @@ export function ModelSelector() {
   const containerRef = useRef<HTMLDivElement>(null)
   const provider = useChatStore((s) => s.provider)
   const model = useChatStore((s) => s.model)
-  const setModel = useChatStore((s) => s.setModel)
   const isStreaming = useChatStore((s) => s.isStreaming)
 
-  useEffect(() => {
+  // Reload on mount and whenever the list opens, so changes made in Settings show up
+  const loadModels = useCallback(() => {
     fetchModels()
       .then(setModels)
-      .catch(() => setModels([]))
+      .catch(() => {
+        // Keep the last list if the backend is briefly unavailable
+      })
   }, [])
+
+  useEffect(() => {
+    loadModels()
+  }, [loadModels])
+
+  useEffect(() => {
+    if (open) loadModels()
+  }, [open, loadModels])
+
+  // The selected model must be one the user enabled; otherwise switch to the first enabled one
+  const setModel = useChatStore((s) => s.setModel)
+  useEffect(() => {
+    if (models.length === 0) return
+    const stillEnabled = models.some((m) => m.provider === provider && m.id === model)
+    if (!stillEnabled) setModel(models[0].provider, models[0].id)
+  }, [models, provider, model, setModel])
 
   // Close on click outside or Escape
   useEffect(() => {
@@ -46,7 +68,6 @@ export function ModelSelector() {
         setOpen(false)
       }
     }
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
@@ -60,10 +81,22 @@ export function ModelSelector() {
   }, [open])
 
   const current = models.find((m) => m.provider === provider && m.id === model)
-  // Short model name — strip "provider/" prefix
   const rawLabel = current ? current.name : model
   const modelLabel = rawLabel.includes('/') ? rawLabel.split('/').pop()! : rawLabel
   const providerLabel = PROVIDER_DISPLAY[provider] ?? provider
+
+  // Nothing enabled yet: the button itself opens Settings, no popup
+  if (models.length === 0) {
+    return (
+      <button
+        onClick={() => window.dispatchEvent(new Event('open-settings'))}
+        className="flex items-center gap-2 rounded-xl bg-card border border-border/60 px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent shadow-sm transition-all"
+      >
+        No model
+        <span className="text-xs text-foreground/50">· Settings</span>
+      </button>
+    )
+  }
 
   return (
     <div className="relative" ref={containerRef}>
@@ -72,28 +105,26 @@ export function ModelSelector() {
         disabled={isStreaming}
         className="flex items-center gap-2 rounded-xl bg-card border border-border/60 pl-3 pr-2.5 py-1.5 hover:bg-accent shadow-sm disabled:opacity-50 transition-all"
       >
-        {/* Provider badge */}
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-foreground/[0.07] text-foreground/50 shrink-0 uppercase tracking-wide">
           {providerLabel}
         </span>
-        {/* Model name */}
         <span className="max-w-[160px] truncate text-sm font-medium text-foreground/80">{modelLabel}</span>
         <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground/60 transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <div className="absolute right-0 top-full mt-2 z-50 min-w-[240px] max-h-[70vh] overflow-y-auto rounded-2xl border border-border/60 bg-card p-1.5 shadow-lg backdrop-blur-xl">
-          {models.length === 0 && (
-            <div className="px-3.5 py-3 text-sm text-muted-foreground">No models available</div>
-          )}
-
           {Object.entries(groupByProvider(models)).map(([providerName, providerModels]) => (
             <div key={providerName}>
-              <div className="px-3.5 py-2 text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
-                {providerName}
+              <div className="px-3 py-2 text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+                {PROVIDER_DISPLAY[providerName] ?? providerName}
               </div>
               {providerModels.map((m) => {
                 const isActive = m.provider === provider && m.id === model
+                const dotColor = m.status?.ok ? 'bg-green-500' : m.status ? 'bg-red-500' : 'bg-foreground/20'
+                const dotTitle = m.status?.ok
+                  ? `Works (${m.status.ms ?? '?'} ms)`
+                  : m.status ? 'Last test failed' : 'Not tested'
                 return (
                   <button
                     key={`${m.provider}-${m.id}`}
@@ -101,13 +132,15 @@ export function ModelSelector() {
                       setModel(m.provider, m.id)
                       setOpen(false)
                     }}
-                    className={`w-full text-left rounded-xl px-3.5 py-2 text-sm transition-colors ${
-                      isActive
-                        ? 'bg-accent font-medium text-foreground'
-                        : 'text-foreground/80 hover:bg-accent/60'
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] transition-colors ${
+                      isActive ? 'bg-accent font-medium text-foreground' : 'text-foreground/75 hover:bg-accent/60'
                     }`}
                   >
-                    {m.name}
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor}`} title={dotTitle} />
+                    <span className="min-w-0 flex-1 truncate">{m.name}</span>
+                    {m.supports_images && (
+                      <ImageIcon className="h-3 w-3 shrink-0 text-muted-foreground/50" strokeWidth={1.8} aria-label="Supports images" />
+                    )}
                   </button>
                 )
               })}

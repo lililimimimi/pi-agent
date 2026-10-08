@@ -40,15 +40,15 @@ describe('parseDataUrl', () => {
 
 describe('stripImageMarker', () => {
   it('removes the marker written after the text', () => {
-    expect(stripImageMarker('帮我分析一下\n[附图 1 张]')).toBe('帮我分析一下')
+    expect(stripImageMarker('describe it\n[1 image attached]')).toBe('describe it')
   })
 
   it('removes the marker when the message had no text', () => {
-    expect(stripImageMarker('[附图 2 张]')).toBe('')
+    expect(stripImageMarker('[2 images attached]')).toBe('')
   })
 
   it('leaves ordinary text alone', () => {
-    expect(stripImageMarker('[附图 说明] 不是标记')).toBe('[附图 说明] 不是标记')
+    expect(stripImageMarker('[see notes] not a marker')).toBe('[see notes] not a marker')
   })
 })
 

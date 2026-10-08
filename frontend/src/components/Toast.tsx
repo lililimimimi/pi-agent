@@ -133,13 +133,13 @@ function Toast({ toast, onDismiss }: ToastProps) {
           }}
           className="shrink-0 text-sm font-semibold text-red-600 transition-colors hover:text-red-800"
         >
-          重试
+          Retry
         </button>
       )}
 
       <button
         type="button"
-        aria-label="关闭"
+        aria-label="Close"
         onClick={(e) => {
           e.stopPropagation()
           dismiss()

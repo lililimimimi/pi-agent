@@ -27,7 +27,7 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
   // File clicked in the sidebar tree → prefill the prompt and attach its content
   useEffect(() => {
     if (!pendingFile) return
-    const prompt = `请分析这个文件：\`${pendingFile.path}\``
+    const prompt = `Please analyze this file: \`${pendingFile.path}\``
     setText((prev) => (prev.trim() ? `${prev.trimEnd()}\n${prompt}` : prompt))
     setAttachedFile(pendingFile)
     clearPendingFile()
@@ -40,7 +40,7 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
     if (!canSend) return
     const prompt = text.trim()
     const message = attachedFile
-      ? `${prompt}\n\n文件 \`${attachedFile.path}\`：\n\`\`\`\n${attachedFile.content}\n\`\`\``
+      ? `${prompt}\n\nFile \`${attachedFile.path}\`:\n\`\`\`\n${attachedFile.content}\n\`\`\``
       : prompt
     sendMessage(message, images)
     setText('')
@@ -60,16 +60,16 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
   const addImageFiles = async (files: File[]) => {
     const room = MAX_IMAGES_PER_MESSAGE - images.length
     if (room <= 0) {
-      showToast({ type: 'error', message: `每条消息最多 ${MAX_IMAGES_PER_MESSAGE} 张图片` })
+      showToast({ type: 'error', message: `Up to ${MAX_IMAGES_PER_MESSAGE} images per message` })
       return
     }
     if (files.length > room) {
-      showToast({ type: 'error', message: `最多还能添加 ${room} 张图片` })
+      showToast({ type: 'error', message: `You can add ${room} more image(s)` })
     }
     for (const file of files.slice(0, room)) {
-      const label = file.name || '图片'
+      const label = file.name || 'Image'
       if (!isAllowedImageType(file.type)) {
-        showToast({ type: 'error', message: `${label}：只支持 JPEG、PNG、GIF、WebP 图片` })
+        showToast({ type: 'error', message: `${label}: only JPEG, PNG, GIF and WebP are supported` })
         continue
       }
       try {
@@ -84,7 +84,7 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
         const attachment: ImageAttachment = { id: `img-${++attachCounter}`, name: file.name || 'pasted-image', dataUrl }
         setImages((prev) => (prev.length >= MAX_IMAGES_PER_MESSAGE ? prev : [...prev, attachment]))
       } catch {
-        showToast({ type: 'error', message: '读取图片失败，请重试' })
+        showToast({ type: 'error', message: 'Could not read the image. Try again.' })
       }
     }
   }
@@ -193,7 +193,7 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
           <button
             onClick={() => fileRef.current?.click()}
             disabled={images.length >= MAX_IMAGES_PER_MESSAGE}
-            title={images.length >= MAX_IMAGES_PER_MESSAGE ? `每条消息最多 ${MAX_IMAGES_PER_MESSAGE} 张图片` : '附加图片'}
+            title={images.length >= MAX_IMAGES_PER_MESSAGE ? `Up to ${MAX_IMAGES_PER_MESSAGE} images per message` : 'Attach images'}
             className="shrink-0 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
             <Paperclip className="h-4 w-4" />

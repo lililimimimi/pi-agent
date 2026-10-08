@@ -14,6 +14,17 @@ import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { useChatStore } from '@/stores/chatStore'
 import { PanelLeft } from 'lucide-react'
 
+// Folder the agent works in, so it is always clear which project a chat uses
+function WorkingDirectory() {
+  const path = useChatStore((s) => s.projects.find((p) => p.id === s.activeProjectId)?.path)
+  // General has no folder of its own: chats there use the home folder
+  return (
+    <span className="max-w-[260px] truncate text-xs text-muted-foreground" title={path ?? 'Home folder'}>
+      {path ?? '~ (home)'}
+    </span>
+  )
+}
+
 function ActiveApprovalModal() {
   const permissionRequests = useChatStore((s) => s.permissionRequests)
   // Find the first pending request
@@ -47,8 +58,8 @@ export function App() {
   // ── Toast + Network status ──
   const { showToast } = useToast()
   const networkCallbacks = useMemo(() => ({
-    onOffline: () => showToast({ type: 'error', message: '网络连接已断开，请检查网络', duration: 0 }),
-    onOnline: () => showToast({ type: 'success', message: '网络连接已恢复' }),
+    onOffline: () => showToast({ type: 'error', message: 'Network connection lost. Check your network.', duration: 0 }),
+    onOnline: () => showToast({ type: 'success', message: 'Network connection restored.' }),
   }), [showToast])
   useNetworkStatus(networkCallbacks)
 
@@ -72,6 +83,13 @@ export function App() {
     }
     init()
   }, [initProvider, loadPersistedSessions, loadPersistedProjects, restoreLastView])
+
+  // Opened from the model picker's empty state
+  useEffect(() => {
+    const open = () => setSettingsOpen(true)
+    window.addEventListener('open-settings', open)
+    return () => window.removeEventListener('open-settings', open)
+  }, [])
 
   // ⌘B — toggle sidebar
   useEffect(() => {
@@ -101,6 +119,7 @@ export function App() {
             <PanelLeft className="h-4 w-4" strokeWidth={1.8} />
           </button>
           <div className="flex-1" />
+          <WorkingDirectory />
           <ContextBar />
           <TokenCounter />
           <ModelSelector />

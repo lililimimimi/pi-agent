@@ -498,6 +498,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }))
       const { provider, model, sessions, activeId } = get()
       const currentSession = sessions.find((s) => s.id === activeId)
+      // The active project's folder; General has none, so the bridge uses the home folder
       const projectPath = get().projects.find((p) => p.id === get().activeProjectId)?.path
       const result = await createChat(history, provider, model, currentSession?.persistId ?? undefined, projectPath)
       const sessionId = result.session_id

@@ -11,7 +11,7 @@ vi.mock('@/services/api', () => ({
 
 const mockPreview = {
   previewId: 'pv-test-1',
-  steps: ['读取 main.py', '修改 foo()', '运行 pytest'],
+  steps: ['Read main.py', 'Edit foo()', 'Run pytest'],
   hasWriteOps: true,
 }
 
@@ -25,21 +25,21 @@ describe('ExecutionPreviewCard', () => {
 
   it('renders the step list', () => {
     render(<ExecutionPreviewCard preview={mockPreview} onDone={onDone} />)
-    expect(screen.getByText('读取 main.py')).toBeInTheDocument()
-    expect(screen.getByText('修改 foo()')).toBeInTheDocument()
-    expect(screen.getByText('运行 pytest')).toBeInTheDocument()
+    expect(screen.getByText('Read main.py')).toBeInTheDocument()
+    expect(screen.getByText('Edit foo()')).toBeInTheDocument()
+    expect(screen.getByText('Run pytest')).toBeInTheDocument()
   })
 
-  it('calls confirmPreview and onDone when "继续执行" is clicked', async () => {
+  it('calls confirmPreview and onDone when "Continue" is clicked', async () => {
     render(<ExecutionPreviewCard preview={mockPreview} onDone={onDone} />)
-    fireEvent.click(screen.getByRole('button', { name: '继续执行' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     await waitFor(() => expect(api.confirmPreview).toHaveBeenCalledWith('pv-test-1'))
     await waitFor(() => expect(onDone).toHaveBeenCalled())
   })
 
-  it('calls cancelPreview and onDone when "取消" is clicked', async () => {
+  it('calls cancelPreview and onDone when "Cancel" is clicked', async () => {
     render(<ExecutionPreviewCard preview={mockPreview} onDone={onDone} />)
-    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(api.cancelPreview).toHaveBeenCalledWith('pv-test-1'))
     await waitFor(() => expect(onDone).toHaveBeenCalled())
   })

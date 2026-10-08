@@ -19,12 +19,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // Models & API keys → pi-bridge (Pi SDK ModelRuntime)
-      '/api/models': {
-        target: 'http://localhost:3100',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
+      // API keys → pi-bridge (Pi SDK ModelRuntime).
+      // /api/models is served by the backend, which reads the enabled-model settings
       '/api/api-keys': {
         target: 'http://localhost:3100',
         changeOrigin: true,

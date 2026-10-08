@@ -21,31 +21,31 @@ describe('DeleteProjectDialog', () => {
   it('shows the folder path and session count before anything is deleted', () => {
     renderDialog()
     expect(screen.getByText('/Users/me/Desktop/rules')).toBeTruthy()
-    expect(screen.getByText(/3 个会话/)).toBeTruthy()
+    expect(screen.getByText(/3 conversation/)).toBeTruthy()
   })
 
   it('explains what each of the two delete buttons does', () => {
     renderDialog()
-    expect(screen.getByText('桌面上的文件夹和里面的文件都保留，只是应用里不再显示它。')).toBeTruthy()
-    expect(screen.getByText('除了上面的操作，还会把整个文件夹移到废纸篓，之后可以从废纸篓恢复。')).toBeTruthy()
+    expect(screen.getByText('The folder and its files stay on disk. The app just stops showing it.')).toBeTruthy()
+    expect(screen.getByText('Does the same as above, and also moves the whole folder to the Trash. You can restore it from there.')).toBeTruthy()
   })
 
   it('cancel deletes nothing', () => {
     const { onCancel, onConfirm } = renderDialog()
-    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onCancel).toHaveBeenCalled()
     expect(onConfirm).not.toHaveBeenCalled()
   })
 
-  it('"仅移除项目和会话" does not ask to delete the folder', () => {
+  it('"Remove project and conversations only" does not ask to delete the folder', () => {
     const { onConfirm } = renderDialog()
-    fireEvent.click(screen.getByRole('button', { name: '仅移除项目和会话' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove project and conversations only' }))
     expect(onConfirm).toHaveBeenCalledWith(false)
   })
 
-  it('"同时移到废纸篓" is the only option that moves the folder', () => {
+  it('"Also move folder to Trash" is the only option that moves the folder', () => {
     const { onConfirm } = renderDialog()
-    fireEvent.click(screen.getByRole('button', { name: '同时移到废纸篓' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Also move folder to Trash' }))
     expect(onConfirm).toHaveBeenCalledWith(true)
   })
 })

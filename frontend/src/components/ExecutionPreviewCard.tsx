@@ -64,7 +64,7 @@ export function ExecutionPreviewCard({ preview, onDone }: Props) {
     <Card className="p-4 border border-border/60 bg-muted/30 rounded-2xl space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-foreground">
-          Agent 打算执行以下操作：
+          The agent plans to run the following:
         </p>
         <span className="text-xs text-muted-foreground tabular-nums">
           {remaining}s
@@ -89,7 +89,7 @@ export function ExecutionPreviewCard({ preview, onDone }: Props) {
           disabled={busy}
           className="rounded-xl"
         >
-          继续执行
+          Continue
         </Button>
         <Button
           size="sm"
@@ -98,7 +98,7 @@ export function ExecutionPreviewCard({ preview, onDone }: Props) {
           disabled={busy}
           className="rounded-xl"
         >
-          取消
+          Cancel
         </Button>
       </div>
     </Card>

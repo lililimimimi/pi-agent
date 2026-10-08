@@ -35,22 +35,22 @@ export function DeleteProjectDialog({
           <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" strokeWidth={1.8} />
           <div className="space-y-3 text-sm">
             <h2 id="delete-project-title" className="text-base font-semibold">
-              删除项目「{projectName}」？
+              Delete project “{projectName}”?
             </h2>
             <p className="text-muted-foreground">
-              无论选哪一个，都会从应用里移除这个项目，并删除它的 {sessionCount} 个会话记录。
+              Either way, the project is removed from the app and its {sessionCount} conversation(s) are deleted.
             </p>
             <p className="break-all rounded-lg bg-foreground/[0.04] px-3 py-2 font-mono text-xs">
               {folderPath}
             </p>
             <dl className="space-y-2 text-muted-foreground">
               <div>
-                <dt className="font-medium text-foreground/80">仅移除项目和会话</dt>
-                <dd>桌面上的文件夹和里面的文件都保留，只是应用里不再显示它。</dd>
+                <dt className="font-medium text-foreground/80">Remove project and conversations only</dt>
+                <dd>The folder and its files stay on disk. The app just stops showing it.</dd>
               </div>
               <div>
-                <dt className="font-medium text-foreground/80">同时移到废纸篓</dt>
-                <dd>除了上面的操作，还会把整个文件夹移到废纸篓，之后可以从废纸篓恢复。</dd>
+                <dt className="font-medium text-foreground/80">Also move folder to Trash</dt>
+                <dd>Does the same as above, and also moves the whole folder to the Trash. You can restore it from there.</dd>
               </div>
             </dl>
           </div>
@@ -61,19 +61,19 @@ export function DeleteProjectDialog({
             onClick={onCancel}
             className="rounded-lg px-3 py-2 text-sm text-foreground/70 hover:bg-accent transition-colors"
           >
-            取消
+            Cancel
           </button>
           <button
             onClick={() => onConfirm(false)}
             className="rounded-lg bg-foreground/[0.07] px-3 py-2 text-sm font-medium hover:bg-foreground/[0.12] transition-colors"
           >
-            仅移除项目和会话
+            Remove project and conversations only
           </button>
           <button
             onClick={() => onConfirm(true)}
             className="rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
           >
-            同时移到废纸篓
+            Also move folder to Trash
           </button>
         </div>
       </div>

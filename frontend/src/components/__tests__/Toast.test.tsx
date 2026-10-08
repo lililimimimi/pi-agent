@@ -62,7 +62,7 @@ describe('Toast', () => {
     })
   })
 
-  it('error toast with onRetry shows "重试" button', () => {
+  it('error toast with onRetry shows "Retry" button', () => {
     const onRetry = vi.fn()
     const { result } = renderToastHook()
 
@@ -70,10 +70,10 @@ describe('Toast', () => {
       result.current.showToast({ type: 'error', message: '出错了', onRetry })
     })
 
-    expect(screen.getByText('重试')).toBeInTheDocument()
+    expect(screen.getByText('Retry')).toBeInTheDocument()
   })
 
-  it('clicking dismiss (关闭) removes the toast', async () => {
+  it('clicking dismiss (Close) removes the toast', async () => {
     const user = userEvent.setup()
     const { result } = renderToastHook()
 
@@ -83,7 +83,7 @@ describe('Toast', () => {
 
     expect(screen.getByText('可以关闭')).toBeInTheDocument()
 
-    await user.click(screen.getByLabelText('关闭'))
+    await user.click(screen.getByLabelText('Close'))
 
     await waitFor(() => {
       expect(screen.queryByText('可以关闭')).not.toBeInTheDocument()

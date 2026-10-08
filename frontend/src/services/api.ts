@@ -1,4 +1,8 @@
 import type { SSEEventData } from '@/types'
+import { z } from 'zod'
+import {
+  CatalogGroupSchema, ModelSchema, ProviderSchema, TestResultSchema, parseResponse,
+} from '@/lib/schemas'
 
 const BASE = '/api'
 
@@ -93,11 +97,18 @@ export async function approveToolCall(
  * Fetch all available models from the backend.
  */
 export async function fetchModels(): Promise<
-  { id: string; name: string; provider: string; supports_tools: boolean }[]
+  {
+    id: string
+    name: string
+    provider: string
+    supports_tools: boolean
+    supports_images: boolean
+    status: ModelTestStatus | null
+  }[]
 > {
   const res = await fetch(`${BASE}/models`)
   if (!res.ok) throw new Error(`Failed to fetch models: ${res.status}`)
-  return await res.json()
+  return parseResponse(z.array(ModelSchema), await res.json(), 'GET /api/models')
 }
 
 /**
@@ -132,6 +143,7 @@ export type ProviderInfo = {
   configured: boolean
   note?: string        // extra info (e.g. OAuth expiry)
   readonly?: boolean   // true for auto-detected providers like pi
+  custom?: boolean     // added by the user (can be removed)
 }
 
 export type TestResult = {
@@ -145,7 +157,7 @@ export type TestResult = {
 export async function fetchProviders(): Promise<ProviderInfo[]> {
   const res = await fetch(`${BASE}/providers`)
   if (!res.ok) throw new Error(`Failed to fetch providers: ${res.status}`)
-  return await res.json()
+  return parseResponse(z.array(ProviderSchema), await res.json(), 'GET /api/providers')
 }
 
 /** Update a provider's api_key / base_url / enabled. */
@@ -346,4 +358,89 @@ export async function revealSessionFile(sessionId: string): Promise<void> {
 export async function revealProjectFolder(projectId: string): Promise<void> {
   const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/reveal`, { method: 'POST' })
   if (!res.ok) throw new Error(await errorMessage(res, 'Could not open the folder'))
+}
+
+/** Sends one short prompt to a model. Costs a few tokens; only call on user action. */
+export async function testModel(
+  provider: string,
+  model: string,
+): Promise<{ ok: boolean; error?: string; ms?: number }> {
+  const res = await fetch(`${BASE}/models/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider, model }),
+  })
+  if (!res.ok) return { ok: false, error: `HTTP ${res.status}` }
+  return parseResponse(TestResultSchema, await res.json(), 'POST /api/models/test')
+}
+
+// ── Model catalog & enabled models ──────────────────────────────
+
+export type ModelTestStatus = {
+  ok: boolean
+  checked_at?: string
+  error?: string | null
+  ms?: number
+}
+
+export type CatalogModel = {
+  id: string
+  name: string
+  supports_images: boolean
+  enabled: boolean
+  status: ModelTestStatus | null
+}
+
+export type CatalogGroup = {
+  provider: string
+  label: string
+  models: CatalogModel[]
+}
+
+/** Every known model, grouped by provider, for the Settings page. */
+export async function fetchModelCatalog(): Promise<CatalogGroup[]> {
+  const res = await fetch(`${BASE}/models/catalog`)
+  if (!res.ok) throw new Error(`Failed to load model catalog: ${res.status}`)
+  return parseResponse(z.array(CatalogGroupSchema), await res.json(), 'GET /api/models/catalog')
+}
+
+/** Replaces the list of enabled models for one provider. */
+export async function setEnabledModels(provider: string, models: string[]): Promise<void> {
+  const res = await fetch(`${BASE}/models/enabled`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider, models }),
+  })
+  if (!res.ok) throw new Error(`Failed to save models: ${res.status}`)
+}
+
+// ── User-added providers ────────────────────────────────────────
+
+/** Adds an OpenAI-compatible provider; the backend fetches its model list. */
+export async function createCustomProvider(body: {
+  name: string
+  base_url: string
+  api_key: string
+}): Promise<{ id: string; models: string[]; error: string | null }> {
+  const res = await fetch(`${BASE}/providers/custom`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => null)
+    throw new Error(data?.detail || `Failed to add provider: ${res.status}`)
+  }
+  return await res.json()
+}
+
+/** Logs out of an in-app OAuth login (ChatGPT subscription). */
+export async function logoutProvider(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/providers/${encodeURIComponent(id)}/logout`, { method: 'POST' })
+  if (!res.ok) throw new Error(`Failed to log out: ${res.status}`)
+}
+
+export async function deleteCustomProvider(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/providers/custom/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Failed to remove provider: ${res.status}`)
 }

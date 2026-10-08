@@ -8,10 +8,10 @@ export function isAllowedImageType(type: string): boolean {
 /** Returns an error message for a file the backend would reject, or null if it is fine. */
 export function validateImageFile(file: { type: string; size: number }): string | null {
   if (!isAllowedImageType(file.type)) {
-    return '只支持 JPEG、PNG、GIF、WebP 图片'
+    return 'Only JPEG, PNG, GIF and WebP images are supported'
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    return '图片不能超过 5MB'
+    return 'Images must be 5MB or smaller'
   }
   return null
 }
@@ -88,11 +88,11 @@ export function parseDataUrl(dataUrl: string): { mediaType: string; data: string
 export const MAX_IMAGES_PER_MESSAGE = 4
 
 /**
- * Removes the "[附图 N 张]" marker the backend writes into session files,
+ * Removes the "[N image(s) attached]" marker the backend writes into session files,
  * so restored messages show only what the user typed.
  */
 export function stripImageMarker(text: string): string {
-  return text.replace(/(\n)?\[附图 \d+ 张\]$/, '')
+  return text.replace(/(\n)?\[\d+ images? attached\]$/, '')
 }
 
 /** Image files in a clipboard or drop item list (screenshots and copied images included). */
