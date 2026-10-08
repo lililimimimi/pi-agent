@@ -93,6 +93,7 @@ def _make_mock_bridge(fake_lines: list[str]):
             yield line
 
     mock_resp = AsyncMock()
+    mock_resp.status_code = 200
     mock_resp.aiter_lines = _fake_aiter_lines
 
     mock_client_instance = AsyncMock()

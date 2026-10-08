@@ -9,7 +9,7 @@ import httpx
 from loguru import logger
 
 from app.models.base import ModelProvider, ModelInfo
-from app.types import Message, Role, TextChunk, ToolCallChunk
+from app.types import Message, Role, TextChunk, ToolCallChunk, text_of
 
 
 # ---------------------------------------------------------------------------
@@ -57,12 +57,13 @@ def _to_openai_messages(messages: list[Message]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for msg in messages:
         if msg.role == Role.USER:
-            result.append({"role": "user", "content": msg.content})
+            # DeepSeek chat models take text only; attached images are not sent
+            result.append({"role": "user", "content": text_of(msg.content)})
 
         elif msg.role == Role.ASSISTANT:
             entry: dict[str, Any] = {"role": "assistant"}
-            if msg.content:
-                entry["content"] = msg.content
+            if text_of(msg.content):
+                entry["content"] = text_of(msg.content)
             if msg.tool_calls:
                 entry["tool_calls"] = [
                     {
@@ -75,7 +76,7 @@ def _to_openai_messages(messages: list[Message]) -> list[dict[str, Any]]:
                     }
                     for tc in msg.tool_calls
                 ]
-            if not msg.content and not msg.tool_calls:
+            if not text_of(msg.content) and not msg.tool_calls:
                 entry["content"] = ""
             result.append(entry)
 

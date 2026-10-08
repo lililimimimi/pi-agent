@@ -17,7 +17,16 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.types import Message, Role
+from app.types import (
+    IMAGE_MEDIA_TYPES,
+    MAX_IMAGE_BYTES,
+    MAX_IMAGES_PER_MESSAGE,
+    Message,
+    MessageContent,
+    Role,
+    images_of,
+    text_of,
+)
 from app.sessions import store as session_store
 from app.sessions.models import MessageRecord
 
@@ -65,6 +74,49 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _parse_content(raw: Any) -> str | list[MessageContent]:
+    """Validate and convert the `content` field of an incoming message.
+
+    Accepts a plain string, or a list of {type: text} / {type: image} parts.
+    """
+    if not isinstance(raw, list):
+        return "" if raw is None else str(raw)
+
+    parts: list[MessageContent] = []
+    image_count = 0
+    for part in raw:
+        try:
+            item = MessageContent.model_validate(part)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid content part")
+        if item.type == "image":
+            image_count += 1
+            if item.image is None:
+                raise HTTPException(status_code=400, detail="Image part is missing data")
+            if item.image.media_type not in IMAGE_MEDIA_TYPES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported image type: {item.image.media_type}",
+                )
+            # base64 expands by 4/3; this is the decoded size
+            if len(item.image.data) * 3 // 4 > MAX_IMAGE_BYTES:
+                raise HTTPException(status_code=400, detail="Image exceeds 5MB")
+            if image_count > MAX_IMAGES_PER_MESSAGE:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"At most {MAX_IMAGES_PER_MESSAGE} images per message",
+                )
+        parts.append(item)
+    return parts
+
+
+def _serialize_content(content: str | list[MessageContent]) -> str | list[dict[str, Any]]:
+    """Shape content for the bridge: a string, or a list of parts without null fields."""
+    if isinstance(content, str):
+        return content
+    return [part.model_dump(exclude_none=True) for part in content]
+
+
 class ChatRequest(BaseModel):
     messages: list[dict[str, Any]]
     provider: str = "mock"
@@ -76,21 +128,26 @@ class ChatRequest(BaseModel):
 @router.post("/chat")
 async def create_chat(req: ChatRequest) -> dict[str, str]:
     messages = [
-        Message(role=Role(msg.get("role", "user")), content=msg.get("content", ""))
+        Message(role=Role(msg.get("role", "user")), content=_parse_content(msg.get("content", "")))
         for msg in req.messages
     ]
     session_id = str(uuid.uuid4())
     persist_id = req.persist_id
 
     if not persist_id:
-        first_content = next((m.content for m in messages if m.role == Role.USER), "")
+        first_content = next((text_of(m.content) for m in messages if m.role == Role.USER), "")
         title = first_content[:20].strip() if first_content else ""
         meta = session_store.create_session(title=title)
         persist_id = meta.id
 
     for m in messages:
+        # Session files store text only; images are noted but not written out
+        record_text = text_of(m.content)
+        n_images = len(images_of(m.content))
+        if n_images:
+            record_text = f"{record_text}\n[附图 {n_images} 张]".strip()
         try:
-            session_store.append_record(persist_id, MessageRecord(role=m.role.value, content=m.content))
+            session_store.append_record(persist_id, MessageRecord(role=m.role.value, content=record_text))
         except FileNotFoundError:
             pass
 
@@ -117,7 +174,7 @@ async def stream_chat(session_id: str) -> StreamingResponse:
                 f"{BRIDGE_URL}/chat",
                 json={
                     "messages": [
-                        {"role": m.role.value, "content": m.content}
+                        {"role": m.role.value, "content": _serialize_content(m.content)}
                         for m in session.messages
                     ],
                     "provider": session.provider,
@@ -125,6 +182,14 @@ async def stream_chat(session_id: str) -> StreamingResponse:
                     "execution_preview": session.execution_preview,
                 },
             ) as resp:
+                if resp.status_code != 200:
+                    # Without this the browser gets nothing and waits forever
+                    detail = (await resp.aread()).decode(errors="replace")[:200]
+                    print(f"[chat] pi-bridge returned {resp.status_code}: {detail}")
+                    message = f"pi-bridge returned HTTP {resp.status_code}"
+                    yield f"data: {_json.dumps({'event': 'error', 'data': {'message': message}})}\n\n"
+                    yield f"data: {_json.dumps({'event': 'done', 'data': {}})}\n\n"
+                    return
                 async for line in resp.aiter_lines():
                     if line.startswith("data: "):
                         yield f"{line}\n\n"
