@@ -3,6 +3,17 @@ import { fetchFileTree, fetchFileContent, type FileNode } from '@/services/api'
 
 export type SidebarView = 'sessions' | 'files'
 
+export const PREVIEW_DEFAULT_WIDTH = 420
+export const PREVIEW_MIN_WIDTH = 280
+// Leaves room for the sidebar and a usable chat column
+const SIDEBAR_AND_CHAT_MIN = 208 + 320
+
+/** Keeps the preview width between a readable minimum and what the window can fit. */
+export function clampPreviewWidth(width: number, viewportWidth: number): number {
+  const max = Math.max(PREVIEW_MIN_WIDTH, Math.min(900, viewportWidth - SIDEBAR_AND_CHAT_MIN))
+  return Math.round(Math.min(max, Math.max(PREVIEW_MIN_WIDTH, width)))
+}
+
 // A file the user clicked in the tree, waiting to be attached in InputBar
 export type PendingFile = { path: string; content: string }
 
@@ -15,6 +26,9 @@ type FileBrowserState = {
   loadingDirs: Set<string>
   error: string | null
   pendingFile: PendingFile | null
+  // File shown in the right-hand preview pane (stays until closed or the root changes)
+  preview: PendingFile | null
+  previewWidth: number
 
   setView: (view: SidebarView) => void
   setRootPath: (path: string | null) => void
@@ -22,6 +36,8 @@ type FileBrowserState = {
   toggleDir: (dir: string) => void
   openFile: (path: string) => Promise<void>
   clearPendingFile: () => void
+  closePreview: () => void
+  setPreviewWidth: (width: number) => void
 }
 
 export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
@@ -32,12 +48,14 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
   loadingDirs: new Set(),
   error: null,
   pendingFile: null,
+  preview: null,
+  previewWidth: PREVIEW_DEFAULT_WIDTH,
 
   setView: (view) => set({ view }),
 
   setRootPath: (path) => {
     if (path === get().rootPath) return
-    set({ rootPath: path, childrenByDir: {}, expanded: new Set(), error: null })
+    set({ rootPath: path, childrenByDir: {}, expanded: new Set(), error: null, preview: null })
     if (path) void get().loadDir('')
   },
 
@@ -79,11 +97,15 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
     try {
       const file = await fetchFileContent(root, path)
       if (get().rootPath !== root) return
-      set({ pendingFile: { path: file.path, content: file.content }, error: null })
+      // Both: the preview pane shows the file, and InputBar gets it as an attachment
+      const opened = { path: file.path, content: file.content }
+      set({ pendingFile: opened, preview: opened, error: null })
     } catch (e) {
       set({ error: (e as Error).message })
     }
   },
 
   clearPendingFile: () => set({ pendingFile: null }),
+  closePreview: () => set({ preview: null }),
+  setPreviewWidth: (width) => set({ previewWidth: width }),
 }))

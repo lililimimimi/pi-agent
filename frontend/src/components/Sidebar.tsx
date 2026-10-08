@@ -3,6 +3,7 @@ import { useChatStore } from '@/stores/chatStore'
 import { AddProjectModal } from '@/components/AddProjectModal'
 import { FileBrowser } from '@/components/FileBrowser'
 import { useFileBrowserStore } from '@/stores/fileBrowserStore'
+import { useLayoutStore, clampSidebarWidth } from '@/stores/layoutStore'
 import {
   Plus, Settings, MessageSquare, Folder, FolderOpen,
   MoreHorizontal, Pencil, Trash2, Check, FolderPlus, Search,
@@ -233,6 +234,25 @@ function ProjectRow({ project, isActive }: { project: { id: string; name: string
 
 // ── Main sidebar ──────────────────────────────────────────────────────────────
 export function Sidebar({ onSettingsClick }: SidebarProps) {
+  const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
+  const setSidebarWidth = useLayoutStore((s) => s.setSidebarWidth)
+
+  // Drag the right edge to resize
+  const handleResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = sidebarWidth
+    const onMove = (ev: PointerEvent) => {
+      setSidebarWidth(clampSidebarWidth(startWidth + (ev.clientX - startX), window.innerWidth))
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
   const projects = useChatStore((s) => s.projects)
   const activeProjectId = useChatStore((s) => s.activeProjectId)
   const sessions = useChatStore((s) => s.sessions)
@@ -293,7 +313,17 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
   }
 
   return (
-    <aside className="w-52 shrink-0 h-full flex flex-col border-r border-border bg-[#E8E8ED]">
+    <aside
+      style={{ width: sidebarWidth }}
+      className="relative shrink-0 h-full flex flex-col border-r border-border bg-[#E8E8ED]"
+    >
+      <div
+        onPointerDown={handleResizeStart}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+        className="absolute right-0 top-0 bottom-0 z-10 w-1.5 translate-x-1/2 cursor-col-resize hover:bg-foreground/10 transition-colors"
+      />
       {/* Header */}
       <div className="flex items-center gap-2 px-4 h-[61px] border-b border-border/40">
         <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-foreground shrink-0">
