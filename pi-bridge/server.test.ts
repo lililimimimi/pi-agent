@@ -90,4 +90,28 @@ describe("preview endpoints", () => {
       await closeServer(server);
     }
   });
+
+  it("accepts a chat body with an inline image larger than the 100KB default", async () => {
+    const server = await startServer(PORT);
+    try {
+      const big = "A".repeat(300_000);
+      const res = await fetch(`${BASE}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: [
+            { type: "text", text: "describe" },
+            { type: "image", image: { media_type: "image/png", data: big } },
+          ] }],
+          provider: "deepseek",
+          model: "deepseek-v4-flash",
+        }),
+      });
+      // Not a 413 from the body parser; the stream opens normally
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+    } finally {
+      await closeServer(server);
+    }
+  });
 });
