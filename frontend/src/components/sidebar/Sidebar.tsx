@@ -11,6 +11,7 @@ import {
 import { revealSessionFile, revealProjectFolder } from '@/services/api'
 import { useToast } from '@/components/Toast'
 import { DeleteProjectDialog } from '@/components/sidebar/DeleteProjectDialog'
+import { isHiddenAutoProject } from '@/lib/projects'
 
 type SidebarProps = {
   onSettingsClick?: () => void
@@ -303,6 +304,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
   const projects = useChatStore((s) => s.projects)
   const activeProjectId = useChatStore((s) => s.activeProjectId)
   const sessions = useChatStore((s) => s.sessions)
+  const sessionProjectIds = new Set(sessions.map((x) => x.projectId))
   const activeId = useChatStore((s) => s.activeId)
   const newSession = useChatStore((s) => s.newSession)
   const bulkDeleteSessions = useChatStore((s) => s.bulkDeleteSessions)
@@ -380,7 +382,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
         <button
           onClick={newSession}
           disabled={isStreaming}
-          title="New Conversation (⌘N)"
+          title="New chat (⌘N)"
           className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors disabled:opacity-40"
         >
           <Plus className="h-4 w-4" strokeWidth={2} />
@@ -440,9 +442,11 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
             </button>
           </div>
           <div className="space-y-px">
-            {projects.map((p) => (
-              <ProjectRow key={p.id} project={p} isActive={p.id === activeProjectId} />
-            ))}
+            {projects
+              .filter((p) => !isHiddenAutoProject(p, sessionProjectIds, activeProjectId))
+              .map((p) => (
+                <ProjectRow key={p.id} project={p} isActive={p.id === activeProjectId} />
+              ))}
           </div>
         </div>
 

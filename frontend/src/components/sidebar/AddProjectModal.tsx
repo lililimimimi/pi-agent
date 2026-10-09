@@ -13,6 +13,8 @@ export function AddProjectModal({ open, onClose }: Props) {
   const [browseData, setBrowseData] = useState<BrowseResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [pathInput, setPathInput] = useState('')
+  const [homePath, setHomePath] = useState('')
 
   // New folder state
   const [creatingFolder, setCreatingFolder] = useState(false)
@@ -30,6 +32,8 @@ export function AddProjectModal({ open, onClose }: Props) {
     try {
       const data = await browseDirs(path)
       setBrowseData(data)
+      setPathInput(data.current)
+      if (!path) setHomePath(data.current) // the first load (no path) starts in the home folder
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to browse directory')
     } finally {
@@ -157,6 +161,35 @@ export function AddProjectModal({ open, onClose }: Props) {
         </div>
 
         {/* Directory list */}
+        {/* Type a path directly, or jump to a common folder */}
+        <div className="space-y-2 border-t border-border/30 px-5 py-3">
+          <input
+            value={pathInput}
+            onChange={(e) => setPathInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && pathInput.trim()) void navigate(pathInput.trim()) }}
+            placeholder="Type a folder path and press Enter"
+            className="h-8 w-full rounded-lg bg-muted/60 px-3 font-mono text-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          />
+          {homePath && (
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { label: 'Home', path: homePath },
+                { label: 'Desktop', path: `${homePath}/Desktop` },
+                { label: 'Documents', path: `${homePath}/Documents` },
+                { label: 'Downloads', path: `${homePath}/Downloads` },
+              ].map((place) => (
+                <button
+                  key={place.label}
+                  onClick={() => void navigate(place.path)}
+                  className="rounded-md bg-muted/60 px-2.5 py-1 text-xs text-foreground/80 hover:bg-accent"
+                >
+                  {place.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-2 border-t border-border/30">
           {loading ? (
             <div className="flex items-center justify-center py-12 text-foreground/70">
@@ -198,13 +231,15 @@ export function AddProjectModal({ open, onClose }: Props) {
                       <button
                         onClick={handleNewFolder}
                         disabled={!newFolderName.trim()}
-                        className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md hover:bg-foreground/10 text-foreground/70 hover:text-foreground disabled:opacity-30 transition-colors"
+                        className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-green-600 hover:bg-green-500/10 disabled:text-muted-foreground/40 disabled:hover:bg-transparent transition-colors"
+                        aria-label="Create folder"
                       >
                         <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
                       </button>
                       <button
                         onClick={cancelNewFolder}
-                        className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md hover:bg-foreground/10 text-foreground/70 hover:text-foreground transition-colors"
+                        className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-red-500 hover:bg-red-500/10 transition-colors"
+                        aria-label="Cancel"
                       >
                         <X className="h-3.5 w-3.5" strokeWidth={2} />
                       </button>
