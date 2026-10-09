@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ApprovalModal } from '../ApprovalModal'
+import { ApprovalModal } from '@/components/chat/ApprovalModal'
 import { useChatStore, type PermissionRequest } from '@/stores/chatStore'
 
 const mockRequest: PermissionRequest = {

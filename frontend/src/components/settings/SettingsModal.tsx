@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Loader2, Server, Info, Plus } from 'lucide-react'
 import { fetchProviders, fetchModelCatalog, type ProviderInfo, type CatalogGroup } from '@/services/api'
-import { ProviderCard } from '@/components/ProviderCard'
-import { AddProviderDialog } from '@/components/AddProviderDialog'
+import { ProviderCard } from '@/components/settings/ProviderCard'
+import { AddProviderDialog } from '@/components/settings/AddProviderDialog'
 import { Button } from '@/components/ui/button'
 
 type SettingsModalProps = {
@@ -107,12 +107,12 @@ function ProvidersPage() {
   return (
     <div>
       <h3 className="text-sm font-semibold mb-1">Providers</h3>
-      <p className="text-[13px] text-muted-foreground mb-4">
+      <p className="text-sm text-muted-foreground mb-4">
         Add API keys, then turn on the models you want in the model picker. Keys are stored locally.
       </p>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-muted-foreground py-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
         </div>
       ) : (
@@ -160,10 +160,10 @@ function AboutPage() {
           </div>
           <div>
             <p className="text-sm font-semibold">pi</p>
-            <p className="text-[13px] text-muted-foreground">AI coding agent</p>
+            <p className="text-sm text-muted-foreground">AI coding agent</p>
           </div>
         </div>
-        <div className="text-[13px] text-muted-foreground space-y-1 pt-1">
+        <div className="text-sm text-muted-foreground space-y-1 pt-1">
           <p>Version 0.1.0</p>
         </div>
       </div>

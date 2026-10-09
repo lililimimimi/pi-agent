@@ -8,7 +8,7 @@ export function TokenCounter() {
   if (total === 0) return null
 
   return (
-    <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground/70 tabular-nums">
+    <div className="flex items-center gap-2.5 text-xs text-muted-foreground tabular-nums">
       <span className="flex items-center gap-0.5">
         <ArrowUp className="h-2.5 w-2.5" />
         {inputTokens.toLocaleString()}

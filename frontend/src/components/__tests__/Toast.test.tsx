@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderHook } from '@testing-library/react'
-import { ToastProvider, useToast } from '../Toast'
+import { ToastProvider, useToast } from '@/components/Toast'
 import type { ReactNode } from 'react'
 
 function wrapper({ children }: { children: ReactNode }) {

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { ChatView } from '../ChatView'
-import { ToastProvider } from '../Toast'
+import { ChatView } from '@/components/chat/ChatView'
+import { ToastProvider } from '@/components/Toast'
 import { useChatStore } from '@/stores/chatStore'
 
 const wrapper = ({ children }: { children: ReactNode }) => (

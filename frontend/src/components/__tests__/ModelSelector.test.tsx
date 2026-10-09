@@ -6,7 +6,7 @@ vi.mock('@/services/api', () => ({
 }))
 
 import { fetchModels } from '@/services/api'
-import { ModelSelector } from '../ModelSelector'
+import { ModelSelector } from '@/components/model/ModelSelector'
 
 const ENABLED = [
   { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'deepseek', supports_tools: true, supports_images: false, status: { ok: true, ms: 500 } },

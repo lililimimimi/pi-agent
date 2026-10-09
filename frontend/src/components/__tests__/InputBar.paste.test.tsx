@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { InputBar } from '../InputBar'
-import { ToastProvider } from '../Toast'
+import { InputBar } from '@/components/chat/InputBar'
+import { ToastProvider } from '@/components/Toast'
 
 // Decoding and canvas work is browser-only; these tests cover the paste wiring
 vi.mock('@/lib/image', async (importOriginal) => {

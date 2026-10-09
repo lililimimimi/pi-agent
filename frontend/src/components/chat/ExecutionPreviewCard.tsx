@@ -66,7 +66,7 @@ export function ExecutionPreviewCard({ preview, onDone }: Props) {
         <p className="text-sm font-medium text-foreground">
           The agent plans to run the following:
         </p>
-        <span className="text-xs text-muted-foreground tabular-nums">
+        <span className="text-sm text-muted-foreground tabular-nums">
           {remaining}s
         </span>
       </div>
@@ -74,7 +74,7 @@ export function ExecutionPreviewCard({ preview, onDone }: Props) {
       <ol className="space-y-1 pl-1">
         {preview.steps.map((step, i) => (
           <li key={i} className="flex gap-2 text-sm text-muted-foreground">
-            <span className="shrink-0 text-xs font-mono text-muted-foreground/60 pt-0.5">
+            <span className="shrink-0 text-sm font-mono text-muted-foreground pt-0.5">
               {i + 1}.
             </span>
             <span>{step}</span>

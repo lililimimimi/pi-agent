@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChatView } from '@/components/ChatView'
-import { InputBar } from '@/components/InputBar'
-import { ModelSelector } from '@/components/ModelSelector'
-import { TokenCounter } from '@/components/TokenCounter'
-import { ContextBar } from '@/components/ContextBar'
-import { Sidebar } from '@/components/Sidebar'
-import { FilePreview } from '@/components/FilePreview'
-import { SettingsModal } from '@/components/SettingsModal'
-import { ApprovalModal } from '@/components/ApprovalModal'
+import { ChatView } from '@/components/chat/ChatView'
+import { InputBar } from '@/components/chat/InputBar'
+import { ModelSelector } from '@/components/model/ModelSelector'
+import { TokenCounter } from '@/components/chat/TokenCounter'
+import { ContextBar } from '@/components/chat/ContextBar'
+import { Sidebar } from '@/components/sidebar/Sidebar'
+import { FilePreview } from '@/components/files/FilePreview'
+import { SettingsModal } from '@/components/settings/SettingsModal'
+import { ApprovalModal } from '@/components/chat/ApprovalModal'
 import { useToast } from '@/components/Toast'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
@@ -19,7 +19,7 @@ function WorkingDirectory() {
   const path = useChatStore((s) => s.projects.find((p) => p.id === s.activeProjectId)?.path)
   // General has no folder of its own: chats there use the home folder
   return (
-    <span className="max-w-[260px] truncate text-xs text-muted-foreground" title={path ?? 'Home folder'}>
+    <span className="max-w-[260px] truncate text-sm text-muted-foreground" title={path ?? 'Home folder'}>
       {path ?? '~ (home)'}
     </span>
   )
@@ -134,7 +134,7 @@ export function App() {
                 <span className="text-5xl font-bold leading-none" style={PI_GRADIENT}>π</span>
               </div>
               <p className="text-2xl font-semibold tracking-tight text-foreground/75">pi</p>
-              <p className="text-sm text-muted-foreground/60 mt-2 font-normal">
+              <p className="text-sm text-muted-foreground mt-2 font-normal">
                 How can I help you today?
               </p>
             </div>

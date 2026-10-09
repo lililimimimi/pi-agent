@@ -122,7 +122,7 @@ export function ProviderModels({ group, onChanged }: Props) {
                   )}
                 </div>
                 {m.status && !m.status.ok && (
-                  <p className="truncate text-xs text-muted-foreground" title={m.status.error ?? ''}>
+                  <p className="truncate text-sm text-muted-foreground" title={m.status.error ?? ''}>
                     {explainError(m.status.error ?? 'Unknown error')}
                   </p>
                 )}

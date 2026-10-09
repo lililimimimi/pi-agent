@@ -30,19 +30,19 @@ export function FileTreeNode({ node, depth }: FileTreeNodeProps) {
         onClick={handleClick}
         title={node.path}
         style={{ paddingLeft: `${8 + depth * 12}px` }}
-        className="flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left text-xs text-foreground/70 hover:bg-black/[0.06] transition-colors"
+        className="flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left text-sm text-foreground/70 hover:bg-black/[0.06] transition-colors"
       >
         {isDir ? (
           <ChevronRight
-            className={`h-3 w-3 shrink-0 text-muted-foreground/50 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
+            className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
             strokeWidth={2}
           />
         ) : (
           <span className="w-3 shrink-0" />
         )}
-        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" strokeWidth={1.8} />
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.8} />
         <span className="truncate leading-snug">{node.name}</span>
-        {loading && <span className="ml-auto text-[10px] text-muted-foreground/40">…</span>}
+        {loading && <span className="ml-auto text-xs text-muted-foreground">…</span>}
       </button>
 
       {isDir && children && (

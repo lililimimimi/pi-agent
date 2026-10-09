@@ -93,7 +93,7 @@ export function ModelSelector() {
         className="flex items-center gap-2 rounded-xl bg-card border border-border/60 px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent shadow-sm transition-all"
       >
         No model
-        <span className="text-xs text-foreground/50">· Settings</span>
+        <span className="text-sm text-foreground/70">· Settings</span>
       </button>
     )
   }
@@ -105,18 +105,18 @@ export function ModelSelector() {
         disabled={isStreaming}
         className="flex items-center gap-2 rounded-xl bg-card border border-border/60 pl-3 pr-2.5 py-1.5 hover:bg-accent shadow-sm disabled:opacity-50 transition-all"
       >
-        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-foreground/[0.07] text-foreground/50 shrink-0 uppercase tracking-wide">
+        <span className="text-xs font-semibold px-1.5 py-0.5 rounded-md bg-foreground/[0.07] text-foreground/70 shrink-0 uppercase tracking-wide">
           {providerLabel}
         </span>
         <span className="max-w-[160px] truncate text-sm font-medium text-foreground/80">{modelLabel}</span>
-        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground/60 transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <div className="absolute right-0 top-full mt-2 z-50 min-w-[240px] max-h-[70vh] overflow-y-auto rounded-2xl border border-border/60 bg-card p-1.5 shadow-lg backdrop-blur-xl">
           {Object.entries(groupByProvider(models)).map(([providerName, providerModels]) => (
             <div key={providerName}>
-              <div className="px-3 py-2 text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+              <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {PROVIDER_DISPLAY[providerName] ?? providerName}
               </div>
               {providerModels.map((m) => {
@@ -132,14 +132,14 @@ export function ModelSelector() {
                       setModel(m.provider, m.id)
                       setOpen(false)
                     }}
-                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] transition-colors ${
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors ${
                       isActive ? 'bg-accent font-medium text-foreground' : 'text-foreground/75 hover:bg-accent/60'
                     }`}
                   >
                     <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor}`} title={dotTitle} />
                     <span className="min-w-0 flex-1 truncate">{m.name}</span>
                     {m.supports_images && (
-                      <ImageIcon className="h-3 w-3 shrink-0 text-muted-foreground/50" strokeWidth={1.8} aria-label="Supports images" />
+                      <ImageIcon className="h-3 w-3 shrink-0 text-muted-foreground" strokeWidth={1.8} aria-label="Supports images" />
                     )}
                   </button>
                 )

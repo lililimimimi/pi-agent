@@ -50,7 +50,7 @@ export function ApprovalModal({ request }: ApprovalModalProps) {
             <ShieldAlert className={`h-5 w-5 ${isDangerous ? 'text-destructive' : 'text-amber-500'}`} />
             <span>Tool Approval Required</span>
             {isDangerous && (
-              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 rounded-md font-medium">
+              <Badge variant="destructive" className="text-xs px-1.5 py-0 rounded-md font-medium">
                 dangerous
               </Badge>
             )}
@@ -72,14 +72,14 @@ export function ApprovalModal({ request }: ApprovalModalProps) {
 
           {/* Arguments */}
           <div>
-            <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Arguments</span>
-            <pre className="mt-1.5 text-xs bg-foreground/[0.03] border border-border/30 p-3 rounded-xl overflow-x-auto max-h-48 text-foreground/70">
+            <span className="text-sm text-muted-foreground uppercase tracking-wider font-medium">Arguments</span>
+            <pre className="mt-1.5 text-sm bg-foreground/[0.03] border border-border/30 p-3 rounded-xl overflow-x-auto max-h-48 text-foreground/70">
               {JSON.stringify(request.arguments, null, 2)}
             </pre>
           </div>
 
           {/* Countdown */}
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Clock className="h-3 w-3" />
             <span>Auto-reject in {countdown}s</span>
           </div>

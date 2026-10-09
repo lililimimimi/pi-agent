@@ -123,24 +123,24 @@ export function ToolCallCard({ toolCall, result, startTime }: ToolCallCardProps)
       {/* Header line */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5">
         {status === 'running' ? (
-          <Loader2 className="h-3 w-3 text-muted-foreground/60 animate-spin shrink-0" />
+          <Loader2 className="h-3 w-3 text-muted-foreground animate-spin shrink-0" />
         ) : (
-          <Wrench className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+          <Wrench className="h-3 w-3 text-muted-foreground shrink-0" />
         )}
-        <span className="font-mono text-xs text-foreground/70">{toolCall.toolName}</span>
+        <span className="font-mono text-sm text-foreground/70">{toolCall.toolName}</span>
         {summary && (
-          <span className="font-mono text-xs text-foreground/50 max-w-[300px] truncate">
+          <span className="font-mono text-sm text-foreground/70 max-w-[300px] truncate">
             {summary}
           </span>
         )}
         <Badge
           variant={config.variant}
-          className={`text-[10px] leading-none px-1.5 py-0 rounded font-medium ${config.className ?? ''}`}
+          className={`text-xs leading-none px-1.5 py-0 rounded font-medium ${config.className ?? ''}`}
         >
           {config.label}
         </Badge>
         {elapsed && (
-          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
+          <span className="flex items-center gap-0.5 text-xs text-muted-foreground ml-auto">
             <Clock className="h-2.5 w-2.5" />
             {elapsed}
           </span>
@@ -152,7 +152,7 @@ export function ToolCallCard({ toolCall, result, startTime }: ToolCallCardProps)
         <button
           type="button"
           onClick={() => setArgsExpanded(!argsExpanded)}
-          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           {argsExpanded ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
           <span>Arguments</span>
@@ -162,7 +162,7 @@ export function ToolCallCard({ toolCall, result, startTime }: ToolCallCardProps)
           <button
             type="button"
             onClick={() => setResultExpanded(!resultExpanded)}
-            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             {resultExpanded ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
             <span>Result</span>
@@ -175,7 +175,7 @@ export function ToolCallCard({ toolCall, result, startTime }: ToolCallCardProps)
               size="sm"
               variant="default"
               onClick={() => approve(toolCall.toolCallId, true)}
-              className="rounded text-[11px] h-6 px-2.5"
+              className="rounded text-xs h-6 px-2.5"
             >
               <Check className="h-2.5 w-2.5 mr-1" /> Approve
             </Button>
@@ -183,7 +183,7 @@ export function ToolCallCard({ toolCall, result, startTime }: ToolCallCardProps)
               size="sm"
               variant="outline"
               onClick={() => approve(toolCall.toolCallId, false)}
-              className="rounded text-[11px] h-6 px-2.5"
+              className="rounded text-xs h-6 px-2.5"
             >
               <X className="h-2.5 w-2.5 mr-1" /> Reject
             </Button>
@@ -193,12 +193,12 @@ export function ToolCallCard({ toolCall, result, startTime }: ToolCallCardProps)
 
       {/* Expanded panels */}
       {argsExpanded && (
-        <pre className="text-xs bg-foreground/[0.03] border-t border-border/20 px-2.5 py-2 overflow-x-auto text-foreground/70">
+        <pre className="text-sm bg-foreground/[0.03] border-t border-border/20 px-2.5 py-2 overflow-x-auto text-foreground/70">
           {JSON.stringify(toolCall.arguments, null, 2)}
         </pre>
       )}
       {result && resultExpanded && (
-        <pre className="text-xs bg-foreground/[0.02] border-t border-border/20 px-2.5 py-2 overflow-x-auto max-h-40 text-foreground/60 whitespace-pre-wrap break-words">
+        <pre className="text-sm bg-foreground/[0.02] border-t border-border/20 px-2.5 py-2 overflow-x-auto max-h-40 text-foreground/60 whitespace-pre-wrap break-words">
           {extractResultText(result.output)}
         </pre>
       )}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useChatStore } from '@/stores/chatStore'
-import { AddProjectModal } from '@/components/AddProjectModal'
-import { FileBrowser } from '@/components/FileBrowser'
+import { AddProjectModal } from '@/components/sidebar/AddProjectModal'
+import { FileBrowser } from '@/components/files/FileBrowser'
 import { useFileBrowserStore } from '@/stores/fileBrowserStore'
 import { useLayoutStore, clampSidebarWidth } from '@/stores/layoutStore'
 import {
@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { revealSessionFile, revealProjectFolder } from '@/services/api'
 import { useToast } from '@/components/Toast'
-import { DeleteProjectDialog } from '@/components/DeleteProjectDialog'
+import { DeleteProjectDialog } from '@/components/sidebar/DeleteProjectDialog'
 
 type SidebarProps = {
   onSettingsClick?: () => void
@@ -108,7 +108,7 @@ function SessionRow({
       onClick={() => { if (!renaming) switchSession(session.id) }}
     >
       <MessageSquare
-        className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-foreground/50' : 'text-muted-foreground/40'}`}
+        className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-foreground/70' : 'text-muted-foreground'}`}
         strokeWidth={1.8}
       />
 
@@ -205,7 +205,7 @@ function ProjectRow({ project, isActive }: { project: { id: string; name: string
       onClick={() => { if (!renaming) switchProject(project.id) }}
     >
       <Icon
-        className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-foreground/50' : 'text-muted-foreground/40'}`}
+        className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-foreground/70' : 'text-muted-foreground'}`}
         strokeWidth={1.8}
       />
 
@@ -374,7 +374,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
       {/* Header */}
       <div className="flex items-center gap-2 px-4 h-[61px] border-b border-border/40">
         <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-foreground shrink-0">
-          <span className="text-background text-[13px] font-semibold leading-none">π</span>
+          <span className="text-background text-sm font-semibold leading-none">π</span>
         </div>
         <span className="text-sm font-semibold tracking-tight truncate flex-1">pi</span>
         <button
@@ -389,7 +389,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
 
       {/* View switcher */}
       <div className="px-3 pt-3">
-        <div className="flex rounded-lg bg-black/[0.05] p-0.5 text-xs font-medium">
+        <div className="flex rounded-lg bg-black/[0.05] p-0.5 text-sm font-medium">
           {(['sessions', 'files'] as const).map((v) => (
             <button
               key={v}
@@ -415,12 +415,12 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
         {/* Global search — above projects */}
         <div className="px-1">
           <div className="flex items-center gap-1.5 rounded-lg bg-white/60 px-2.5 py-1.5">
-            <Search className="h-3 w-3 text-muted-foreground/40 shrink-0" strokeWidth={1.8} />
+            <Search className="h-3 w-3 text-muted-foreground shrink-0" strokeWidth={1.8} />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search sessions…"
-              className="flex-1 min-w-0 bg-transparent text-xs outline-none placeholder:text-muted-foreground/40"
+              className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
         </div>
@@ -428,13 +428,13 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
         {/* Projects section */}
         <div>
           <div className="flex items-center justify-between px-3 pb-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 select-none">
+            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground select-none">
               Projects
             </span>
             <button
               onClick={() => setAddingProject(true)}
               title="Add Project"
-              className="w-4 h-4 flex items-center justify-center text-muted-foreground/50 hover:text-foreground transition-colors"
+              className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
             >
               <FolderPlus className="h-3.5 w-3.5" strokeWidth={1.8} />
             </button>
@@ -450,7 +450,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
         <div>
           {/* Sessions header */}
           <div className="flex items-center justify-between px-3 pb-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 select-none">
+            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground select-none">
               Sessions
             </span>
             {projectSessions.length > 0 && (
@@ -459,7 +459,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
                   if (editMode) { setEditMode(false); setSelected(new Set()) }
                   else setEditMode(true)
                 }}
-                className="text-[10px] font-medium text-muted-foreground/50 hover:text-foreground transition-colors"
+                className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
                 {editMode ? 'Done' : 'Edit'}
               </button>
@@ -471,7 +471,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
             <div className="px-2 pb-1">
               <button
                 onClick={selectAll}
-                className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-foreground/50 hover:bg-black/[0.04] transition-colors"
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm text-foreground/70 hover:bg-black/[0.04] transition-colors"
               >
                 <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                   selected.size === projectSessions.length && projectSessions.length > 0
@@ -492,7 +492,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
           {/* Session list */}
           <div className="space-y-px">
             {projectSessions.length === 0 && (
-              <p className="px-3 py-2 text-xs text-muted-foreground/40 italic">No sessions yet</p>
+              <p className="px-3 py-2 text-sm text-muted-foreground italic">No sessions yet</p>
             )}
             {projectSessions.map((s) => (
               <SessionRow

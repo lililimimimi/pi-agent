@@ -364,7 +364,7 @@ export async function revealProjectFolder(projectId: string): Promise<void> {
 export async function testModel(
   provider: string,
   model: string,
-): Promise<{ ok: boolean; error?: string; ms?: number }> {
+): Promise<{ ok: boolean; error?: string | null; ms?: number | null }> {
   const res = await fetch(`${BASE}/models/test`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -380,7 +380,7 @@ export type ModelTestStatus = {
   ok: boolean
   checked_at?: string
   error?: string | null
-  ms?: number
+  ms?: number | null
 }
 
 export type CatalogModel = {

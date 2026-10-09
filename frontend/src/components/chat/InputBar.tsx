@@ -166,8 +166,8 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
         {/* Attached file chip */}
         {attachedFile && (
           <div className="flex mb-3">
-            <div className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/50 bg-card px-2.5 py-1 text-xs text-foreground/70">
-              <FileText className="h-3 w-3 shrink-0 text-muted-foreground/60" strokeWidth={1.8} />
+            <div className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/50 bg-card px-2.5 py-1 text-sm text-foreground/70">
+              <FileText className="h-3 w-3 shrink-0 text-muted-foreground" strokeWidth={1.8} />
               <span className="truncate">{attachedFile.path}</span>
               <button
                 onClick={() => setAttachedFile(null)}
@@ -207,7 +207,7 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
             onPaste={handlePaste}
             placeholder="Message pi…"
             rows={1}
-            className="flex-1 resize-none bg-transparent text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none min-h-[24px] max-h-[200px]"
+            className="flex-1 resize-none bg-transparent text-sm leading-relaxed placeholder:text-muted-foreground focus:outline-none min-h-[24px] max-h-[200px]"
           />
 
           {isStreaming ? (
@@ -227,10 +227,6 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
             </button>
           )}
         </div>
-
-        <p className="text-[11px] text-muted-foreground/50 text-center mt-2.5 font-normal">
-          Press Enter to send · Shift+Enter for new line
-        </p>
     </div>
   )
 

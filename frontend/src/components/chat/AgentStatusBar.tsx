@@ -65,7 +65,7 @@ export function AgentStatusBar() {
     <div className="flex items-center justify-center py-1.5 px-4 border-b border-border/30 bg-background/80 backdrop-blur-sm">
       <Badge
         variant="outline"
-        className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${config.color} border-current/20`}
+        className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${config.color} border-current/20`}
       >
         <Icon className={`h-3.5 w-3.5 ${config.animate ? 'animate-pulse' : ''}`} />
         <span>{config.label}</span>
@@ -73,7 +73,7 @@ export function AgentStatusBar() {
       <Button
         variant="outline"
         size="sm"
-        className="ml-2 h-6 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+        className="ml-2 h-6 px-2 text-sm text-destructive border-destructive/30 hover:bg-destructive/10"
         onClick={stopAgent}
       >
         <Square className="h-3 w-3 mr-1" />

@@ -134,7 +134,7 @@ export function AddProjectModal({ open, onClose }: Props) {
 
         {/* Breadcrumb */}
         <div className="px-5 pb-2">
-          <div className="flex items-center gap-0.5 text-sm text-foreground/50 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-0.5 text-sm text-foreground/70 overflow-x-auto scrollbar-none">
             <button
               onClick={() => navigate('/')}
               className="shrink-0 p-1 rounded hover:bg-accent hover:text-foreground transition-colors"
@@ -159,7 +159,7 @@ export function AddProjectModal({ open, onClose }: Props) {
         {/* Directory list */}
         <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-2 border-t border-border/30">
           {loading ? (
-            <div className="flex items-center justify-center py-12 text-foreground/40">
+            <div className="flex items-center justify-center py-12 text-foreground/70">
               <Loader2 className="h-5 w-5 animate-spin mr-2" strokeWidth={2} />
               <span className="text-sm">Loading…</span>
             </div>
@@ -172,7 +172,7 @@ export function AddProjectModal({ open, onClose }: Props) {
               {/* New folder input row */}
               {creatingFolder && (
                 <div className="flex items-center gap-2 px-3 py-2 mb-0.5 rounded-lg bg-accent/50">
-                  <Folder className="h-4 w-4 shrink-0 text-foreground/50" strokeWidth={1.8} />
+                  <Folder className="h-4 w-4 shrink-0 text-foreground/70" strokeWidth={1.8} />
                   <div className="flex-1 min-w-0">
                     <input
                       ref={newFolderRef}
@@ -184,27 +184,27 @@ export function AddProjectModal({ open, onClose }: Props) {
                         e.stopPropagation()
                       }}
                       placeholder="New folder name…"
-                      className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/40"
+                      className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                       disabled={newFolderLoading}
                     />
                     {newFolderError && (
-                      <p className="text-xs text-destructive mt-0.5">{newFolderError}</p>
+                      <p className="text-sm text-destructive mt-0.5">{newFolderError}</p>
                     )}
                   </div>
                   {newFolderLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-foreground/40 shrink-0" strokeWidth={2} />
+                    <Loader2 className="h-4 w-4 animate-spin text-foreground/70 shrink-0" strokeWidth={2} />
                   ) : (
                     <>
                       <button
                         onClick={handleNewFolder}
                         disabled={!newFolderName.trim()}
-                        className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md hover:bg-foreground/10 text-foreground/50 hover:text-foreground disabled:opacity-30 transition-colors"
+                        className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md hover:bg-foreground/10 text-foreground/70 hover:text-foreground disabled:opacity-30 transition-colors"
                       >
                         <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
                       </button>
                       <button
                         onClick={cancelNewFolder}
-                        className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md hover:bg-foreground/10 text-foreground/40 hover:text-foreground transition-colors"
+                        className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md hover:bg-foreground/10 text-foreground/70 hover:text-foreground transition-colors"
                       >
                         <X className="h-3.5 w-3.5" strokeWidth={2} />
                       </button>
@@ -215,7 +215,7 @@ export function AddProjectModal({ open, onClose }: Props) {
 
               {/* Existing subdirs */}
               {!creatingFolder && browseData?.dirs.length === 0 && (
-                <div className="flex items-center justify-center py-12 text-foreground/40">
+                <div className="flex items-center justify-center py-12 text-foreground/70">
                   <p className="text-sm">No subdirectories — create a new folder above</p>
                 </div>
               )}
@@ -226,12 +226,12 @@ export function AddProjectModal({ open, onClose }: Props) {
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-accent/70 transition-colors group"
                 >
                   <Folder
-                    className="h-4 w-4 shrink-0 text-foreground/40 group-hover:text-foreground/60"
+                    className="h-4 w-4 shrink-0 text-foreground/70 group-hover:text-foreground/60"
                     strokeWidth={1.8}
                   />
                   <span className="text-sm truncate">{dir.name}</span>
                   <ChevronRight
-                    className="h-3.5 w-3.5 ml-auto shrink-0 text-foreground/20 group-hover:text-foreground/40"
+                    className="h-3.5 w-3.5 ml-auto shrink-0 text-foreground/20 group-hover:text-foreground/70"
                     strokeWidth={2}
                   />
                 </button>
@@ -243,7 +243,7 @@ export function AddProjectModal({ open, onClose }: Props) {
         {/* Footer */}
         <div className="px-5 py-4 border-t border-border/30 flex items-center gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-foreground/40 truncate" title={browseData?.current}>
+            <p className="text-sm text-foreground/70 truncate" title={browseData?.current}>
               {browseData?.current ?? '—'}
             </p>
           </div>

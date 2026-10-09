@@ -43,11 +43,11 @@ export function FilePreview() {
         className="absolute left-0 top-0 bottom-0 z-10 w-1.5 -translate-x-1/2 cursor-col-resize hover:bg-foreground/10 transition-colors"
       />
       <div className="flex items-center gap-2 px-4 h-[61px] border-b border-border/50">
-        <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" strokeWidth={1.8} />
+        <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.8} />
         <span className="truncate flex-1 text-sm font-medium" title={preview.path}>
           {preview.path}
         </span>
-        <span className="shrink-0 text-[11px] text-muted-foreground/60">{lines.length} lines</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{lines.length} lines</span>
         <button
           onClick={closePreview}
           aria-label="Close preview"
@@ -57,10 +57,10 @@ export function FilePreview() {
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto py-2 font-mono text-xs leading-5">
+      <div className="flex-1 min-h-0 overflow-auto py-2 font-mono text-sm leading-5">
         {lines.map((line, i) => (
           <div key={i} className="flex">
-            <span className="w-12 shrink-0 select-none pr-3 text-right text-muted-foreground/40">{i + 1}</span>
+            <span className="w-12 shrink-0 select-none pr-3 text-right text-muted-foreground">{i + 1}</span>
             <span className="whitespace-pre pr-4">{line}</span>
           </div>
         ))}

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { ExecutionPreviewCard } from '@/components/ExecutionPreviewCard'
+import { ExecutionPreviewCard } from '@/components/chat/ExecutionPreviewCard'
 import * as api from '@/services/api'
 
 // Stub the API calls so no real fetch happens

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { MessageBubble } from '@/components/MessageBubble'
-import { ExecutionPreviewCard } from '@/components/ExecutionPreviewCard'
+import { MessageBubble } from '@/components/chat/MessageBubble'
+import { ExecutionPreviewCard } from '@/components/chat/ExecutionPreviewCard'
 import { useChatStore } from '@/stores/chatStore'
 import { useToast } from '@/components/Toast'
 

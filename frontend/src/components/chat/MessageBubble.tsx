@@ -3,7 +3,7 @@ import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Copy, Check, ChevronRight } from 'lucide-react'
-import { ToolCallCard } from '@/components/ToolCallCard'
+import { ToolCallCard } from '@/components/chat/ToolCallCard'
 import type { Message, ToolCall, ToolResult } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -45,11 +45,11 @@ function CodeBlock({ children }: { children: ReactNode }) {
       {/* Language label bar */}
       {lang && (
         <div className="flex items-center justify-between bg-zinc-800 px-4 py-1.5">
-          <span className="text-[11px] font-mono text-zinc-400">{lang}</span>
+          <span className="text-xs font-mono text-zinc-400">{lang}</span>
         </div>
       )}
       <pre className={cn(
-        'px-4 py-3.5 overflow-x-auto text-[13px] leading-relaxed',
+        'px-4 py-3.5 overflow-x-auto text-sm leading-relaxed',
         lang ? 'bg-zinc-950' : 'bg-foreground/[0.05]',
       )}>
         {children}
@@ -60,7 +60,7 @@ function CodeBlock({ children }: { children: ReactNode }) {
         className={cn(
           'absolute right-2.5 flex h-6 w-6 items-center justify-center rounded-lg',
           lang ? 'top-9' : 'top-2.5',
-          lang ? 'text-zinc-500 hover:bg-white/10 hover:text-zinc-300' : 'text-muted-foreground/50 hover:bg-foreground/[0.06] hover:text-foreground/70',
+          lang ? 'text-zinc-500 hover:bg-white/10 hover:text-zinc-300' : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground/70',
           'transition-all duration-200',
           'opacity-0 group-hover/code:opacity-100',
           'cursor-pointer',
@@ -95,7 +95,7 @@ function ListBlock({ children }: { children: ReactNode }) {
         onClick={handleCopy}
         className={cn(
           'absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-lg',
-          'text-muted-foreground/50 transition-all duration-200',
+          'text-muted-foreground transition-all duration-200',
           'opacity-0 group-hover/list:opacity-100',
           'hover:bg-foreground/[0.06] hover:text-foreground/70',
           'cursor-pointer',
@@ -124,7 +124,7 @@ function ToolCallGroup({ toolCalls, toolResults }: { toolCalls: ToolCall[]; tool
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-foreground/80 transition-colors cursor-pointer select-none"
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground/80 transition-colors cursor-pointer select-none"
       >
         <ChevronRight
           className={cn('h-3 w-3 transition-transform duration-150', open && 'rotate-90')}
@@ -167,7 +167,7 @@ const assistantComponents: Components = {
   ),
   h3: ({ children }) => (
     <div className="mt-1">
-      <p className="font-semibold text-[13px] tracking-tight text-foreground">{children}</p>
+      <p className="font-semibold text-sm tracking-tight text-foreground">{children}</p>
       <div className="mt-1 border-b border-foreground/10" />
     </div>
   ),
@@ -210,12 +210,12 @@ const assistantComponents: Components = {
     <tr className="border-b border-border/50 last:border-0 hover:bg-foreground/[0.02] transition-colors">{children}</tr>
   ),
   th: ({ children }) => (
-    <th className="px-4 py-2.5 text-left text-xs font-semibold text-foreground/60 uppercase tracking-wider whitespace-nowrap">
+    <th className="px-4 py-2.5 text-left text-sm font-semibold text-foreground/60 uppercase tracking-wider whitespace-nowrap">
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="px-4 py-2.5 text-[13px] leading-relaxed text-foreground/80">{children}</td>
+    <td className="px-4 py-2.5 text-sm leading-relaxed text-foreground/80">{children}</td>
   ),
 
   // Paragraph

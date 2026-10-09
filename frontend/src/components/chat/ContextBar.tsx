@@ -45,7 +45,7 @@ export function ContextBar() {
 
   return (
     <div className="flex w-[120px] flex-col gap-0.5">
-      <span className="text-[11px] tabular-nums text-muted-foreground/70">
+      <span className="text-xs tabular-nums text-muted-foreground">
         Context {formatTokenCount(inputTokens)} / {formatTokenCount(limit)}
       </span>
       <div className="h-[2px] w-full overflow-hidden rounded-full bg-muted">

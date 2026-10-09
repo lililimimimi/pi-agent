@@ -7,7 +7,7 @@ vi.mock('@/services/api', () => ({
 }))
 
 import { setEnabledModels, testModel } from '@/services/api'
-import { ProviderModels } from '../ProviderModels'
+import { ProviderModels } from '@/components/settings/ProviderModels'
 
 const GROUP = {
   provider: 'deepseek',

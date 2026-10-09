@@ -11,9 +11,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { CheckCircle, XCircle, Loader2, Eye, EyeOff, Zap } from 'lucide-react'
 import { updateProvider, testProvider, type ProviderInfo, type TestResult, type CatalogGroup } from '@/services/api'
-import { ProviderModels } from '@/components/ProviderModels'
+import { ProviderModels } from '@/components/settings/ProviderModels'
 import { deleteCustomProvider, logoutProvider } from '@/services/api'
-import { OAuthLogin } from '@/components/OAuthLogin'
+import { OAuthLogin } from '@/components/settings/OAuthLogin'
 import { Button } from '@/components/ui/button'
 const LOGIN_LABELS: Record<string, string> = {
   pi: 'Log in with Claude.ai',
@@ -88,14 +88,14 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
   // ── Connection status badge ──────────────────────────────────────────────
   const statusBadge = () => {
     if (testStatus === 'testing')
-      return <span className="flex items-center gap-1 text-[13px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Testing…</span>
+      return <span className="flex items-center gap-1 text-sm text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Testing…</span>
     if (testStatus === 'ok' || provider.connected)
-      return <span className="flex items-center gap-1 text-[13px] text-emerald-600"><CheckCircle className="h-3 w-3" /> Connected</span>
+      return <span className="flex items-center gap-1 text-sm text-emerald-600"><CheckCircle className="h-3 w-3" /> Connected</span>
     if (testStatus === 'error')
-      return <span className="flex items-center gap-1 text-[13px] text-destructive"><XCircle className="h-3 w-3" /> Failed</span>
+      return <span className="flex items-center gap-1 text-sm text-destructive"><XCircle className="h-3 w-3" /> Failed</span>
     if (!provider.configured)
-      return <span className="flex items-center gap-1 text-[13px] text-muted-foreground"><XCircle className="h-3 w-3" /> Not configured</span>
-    return <span className="flex items-center gap-1 text-[13px] text-muted-foreground">○ Untested</span>
+      return <span className="flex items-center gap-1 text-sm text-muted-foreground"><XCircle className="h-3 w-3" /> Not configured</span>
+    return <span className="flex items-center gap-1 text-sm text-muted-foreground">○ Untested</span>
   }
 
   const fieldLabel = provider.key_field === 'api_key' ? 'API Key' : provider.key_field === 'base_url' ? 'Base URL' : ''
@@ -109,7 +109,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-[13px] font-semibold">{provider.label}</span>
+          <span className="text-sm font-semibold">{provider.label}</span>
           {statusBadge()}
         </div>
 
@@ -119,7 +119,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
             onClick={handleTest}
             disabled={testStatus === 'testing' || !provider.configured}
             title={provider.configured ? 'Test connection' : 'Configure key first'}
-            className="flex items-center gap-1 text-[13px] text-foreground/70 hover:text-foreground px-2 py-1 rounded-lg hover:bg-accent transition-colors disabled:opacity-30"
+            className="flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground px-2 py-1 rounded-lg hover:bg-accent transition-colors disabled:opacity-30"
           >
             <Zap className="h-3 w-3" />
             Test
@@ -128,7 +128,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
           {provider.custom && (
             <button
               onClick={() => { void deleteCustomProvider(provider.id).then(onUpdate) }}
-              className="text-[13px] text-foreground/70 hover:text-destructive px-2 py-1 rounded-lg hover:bg-accent transition-colors"
+              className="text-sm text-foreground/70 hover:text-destructive px-2 py-1 rounded-lg hover:bg-accent transition-colors"
             >
               Remove
             </button>
@@ -148,7 +148,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
 
       {/* Readonly (pi OAuth) — just show a note */}
       {provider.readonly && (
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {provider.note || 'Auto-detected from Pi CLI login.'}
         </p>
       )}
@@ -156,7 +156,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
       {/* Key / URL row — only for manually-configured providers */}
       {!provider.readonly && <div className="space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="text-[13px] text-muted-foreground w-14 shrink-0">{fieldLabel}</span>
+          <span className="text-sm text-muted-foreground w-14 shrink-0">{fieldLabel}</span>
           {editing ? (
             <div className="flex-1 relative">
               <input
@@ -169,7 +169,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
                   if (e.key === 'Escape') { setEditing(false); setKeyValue(''); setSaveError('') }
                 }}
                 placeholder={provider.placeholder}
-                className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 pr-7 text-[13px] font-mono focus:outline-none focus:border-foreground/30 transition-colors placeholder:text-muted-foreground"
+                className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 pr-7 text-sm font-mono focus:outline-none focus:border-foreground/30 transition-colors placeholder:text-muted-foreground"
               />
               <button
                 type="button"
@@ -180,7 +180,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
               </button>
             </div>
           ) : (
-            <span className="flex-1 text-[13px] font-mono text-muted-foreground truncate">
+            <span className="flex-1 text-sm font-mono text-muted-foreground truncate">
               {currentValue || <span className="text-muted-foreground italic">not set</span>}
             </span>
           )}
@@ -188,7 +188,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
           {!editing && (
             <button
               onClick={() => setEditing(true)}
-              className="text-[13px] text-foreground/70 hover:text-foreground px-2 py-0.5 rounded hover:bg-accent transition-colors shrink-0"
+              className="text-sm text-foreground/70 hover:text-foreground px-2 py-0.5 rounded hover:bg-accent transition-colors shrink-0"
             >
               {provider.configured ? 'Update' : 'Set'}
             </button>
@@ -200,29 +200,29 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
             <button
               onClick={handleSave}
               disabled={saving || !keyValue.trim()}
-              className="text-[13px] bg-foreground text-background rounded-md px-2.5 py-1 font-medium disabled:opacity-40"
+              className="text-sm bg-foreground text-background rounded-md px-2.5 py-1 font-medium disabled:opacity-40"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
             <button
               onClick={() => { setEditing(false); setKeyValue(''); setSaveError('') }}
-              className="text-[13px] text-muted-foreground hover:text-foreground"
+              className="text-sm text-muted-foreground hover:text-foreground"
             >
               Cancel
             </button>
-            {saveError && <span className="text-[13px] text-destructive">{saveError}</span>}
+            {saveError && <span className="text-sm text-destructive">{saveError}</span>}
           </div>
         )}
       </div>}
 
       {/* Test error */}
       {testStatus === 'error' && testResult?.error && (
-        <p className="text-[13px] text-destructive/80 pl-0">{testResult.error}</p>
+        <p className="text-sm text-destructive/80 pl-0">{testResult.error}</p>
       )}
 
       {/* Latency */}
       {testStatus === 'ok' && testResult && (
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {testResult.latency_ms} ms
         </p>
       )}

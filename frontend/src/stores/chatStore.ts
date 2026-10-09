@@ -5,7 +5,7 @@ import {
   fetchProjects, createProjectApi, deleteProjectApi,
   type ContentPart,
 } from '@/services/api'
-import type { ExecutionPreview } from '@/components/ExecutionPreviewCard'
+import type { ExecutionPreview } from '@/components/chat/ExecutionPreviewCard'
 import type { Message, ImageAttachment, TokenUsage, ToolCall, ToolResult } from '@/types'
 import { parseDataUrl, stripImageMarker } from '@/lib/image'
 
