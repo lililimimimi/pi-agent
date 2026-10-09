@@ -249,6 +249,16 @@ export async function fetchProjects(): Promise<ProjectData[]> {
   return await res.json()
 }
 
+/** Saves a session's title in the backend, so it survives a reload. */
+export async function renameSessionApi(sessionId: string, title: string): Promise<void> {
+  const res = await fetch(`${BASE}/sessions/${encodeURIComponent(sessionId)}/title`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  })
+  if (!res.ok) throw new Error(`Failed to rename session: ${res.status}`)
+}
+
 /** Renames the project's folder on disk, and its record and sessions. Throws with the reason if refused. */
 export async function renameProjectApi(id: string, name: string): Promise<ProjectData> {
   const res = await fetch(`${BASE}/projects/${encodeURIComponent(id)}/rename`, {
