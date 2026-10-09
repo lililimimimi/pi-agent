@@ -4,6 +4,7 @@ import {
   buildPreview,
   describeToolCall,
   extractSteps,
+  isProjectEdit,
   isWriteTool,
   PreviewRegistry,
 } from "./preview.js";
@@ -18,6 +19,54 @@ describe("preview classification", () => {
   it("treats edit/write as write tools, and bash as write unless the command only reads", () => {
     for (const tool of ["edit", "write", "powershell"]) {
       assert.equal(isWriteTool(tool), true, `${tool} should be a write tool`);
+    }
+  });
+
+  it("does not ask for a bash command that only reads, even when errors go to /dev/null", () => {
+    const readOnly = [
+      "pwd && ls -la && git status --short 2>/dev/null | head -30",
+      "ls -la >/dev/null",
+      "cat README.md 2>/dev/null",
+      "ls -la /Users/me/web 2>&1 | head -50",
+      "date +%Y-%m-%d && node -v 2>&1 && npm -v 2>&1",
+      "python3 --version",
+    ];
+    for (const command of readOnly) {
+      assert.equal(isWriteTool("bash", { command }), false, `${command} should be read-only`);
+    }
+  });
+
+  it("does not ask for common read-only commands such as cd, sort, find and git log", () => {
+    const readOnly = [
+      "cd /Users/me/app && ls -la",
+      "sort names.txt | uniq -c",
+      "find . -name '*.ts' -not -path './node_modules/*'",
+      "git log --oneline -5",
+      "git ls-files",
+    ];
+    for (const command of readOnly) {
+      assert.equal(isWriteTool("bash", { command }), false, `${command} should be read-only`);
+    }
+  });
+
+  it("still asks for find with delete or exec, and for other writes", () => {
+    const writes = [
+      "find . -name '*.tmp' -delete",
+      "find . -name '*.md' -exec rm {} \\;",
+      "git commit -m x",
+      "rm -rf build",
+      "npm install",
+      "node build.js",
+    ];
+    for (const command of writes) {
+      assert.equal(isWriteTool("bash", { command }), true, `${command} should be a write`);
+    }
+  });
+
+  it("still asks for a bash command that writes to a file", () => {
+    const writes = ["echo hi > notes.txt", "ls 2>errors.log", "cat a.txt >> b.txt"];
+    for (const command of writes) {
+      assert.equal(isWriteTool("bash", { command }), true, `${command} should be a write`);
     }
   });
 });
@@ -127,5 +176,28 @@ describe("PreviewRegistry", () => {
     for (const command of ["rm -rf build", "npm test", "echo hi > out.txt", "git commit -m x", "ls && rm x"]) {
       assert.equal(isWriteTool("bash", { command }), true, `${command} should need confirmation`);
     }
+  });
+});
+
+describe("isProjectEdit (auto-approved edits)", () => {
+  const cwd = "/Users/me/app";
+
+  it("allows edits and new files inside the project", () => {
+    assert.equal(isProjectEdit("edit", { path: "src/App.tsx" }, cwd), true);
+    assert.equal(isProjectEdit("write", { file_path: "docs/plan.md" }, cwd), true);
+    assert.equal(isProjectEdit("edit", { path: "/Users/me/app/src/a.ts" }, cwd), true);
+  });
+
+  it("does not allow paths outside the project", () => {
+    assert.equal(isProjectEdit("edit", { path: "../other/a.ts" }, cwd), false);
+    assert.equal(isProjectEdit("write", { path: "/etc/hosts" }, cwd), false);
+    assert.equal(isProjectEdit("edit", { path: "/Users/me/app-old/a.ts" }, cwd), false);
+  });
+
+  it("never counts shell commands, reads, or calls without a path", () => {
+    assert.equal(isProjectEdit("bash", { command: "echo hi > a.txt" }, cwd), false);
+    assert.equal(isProjectEdit("read", { path: "src/App.tsx" }, cwd), false);
+    assert.equal(isProjectEdit("edit", {}, cwd), false);
+    assert.equal(isProjectEdit("edit", { path: "src/a.ts" }, ""), false);
   });
 });

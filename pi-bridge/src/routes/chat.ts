@@ -8,7 +8,7 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentSession, AgentSessionEvent, ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { buildPreview, isWriteTool } from "../preview.js";
+import { buildPreview, isProjectEdit, isWriteTool } from "../preview.js";
 import { toPromptInput } from "../content.js";
 import { resolveSessionCwd } from "../cwd.js";
 import { pickModelForImages, supportsImages } from "../vision.js";
@@ -21,6 +21,9 @@ const router = express.Router();
 
 type PreviewController = {
   enabled: boolean;
+  /** When on, file edits and new files inside `cwd` run without asking */
+  autoEdits: boolean;
+  cwd: string;
   confirmed: boolean;
   cancelled: boolean;
   assistantText: string;
@@ -36,6 +39,8 @@ function makePreviewExtension(ctrl: PreviewController) {
   return (pi: ExtensionAPI) => {
     pi.on("tool_call", async (event) => {
       if (!ctrl.enabled || ctrl.confirmed || ctrl.cancelled) return;
+      // Auto-approved: a file edit inside the project. Shell commands and outside paths still ask.
+      if (ctrl.autoEdits && isProjectEdit(event.toolName, event.input as Record<string, unknown>, ctrl.cwd)) return;
       if (!isWriteTool(event.toolName, event.input as Record<string, unknown>)) return;
 
       const previewId = crypto.randomUUID();
@@ -93,6 +98,8 @@ router.post("/chat", async (req, res) => {
 
   const previewCtrl: PreviewController = {
     enabled: req.body.execution_preview !== false,
+    autoEdits: req.body.auto_edits === true,
+    cwd: sessionCwd,
     confirmed: false,
     cancelled: false,
     assistantText: "",

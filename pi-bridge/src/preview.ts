@@ -11,6 +11,8 @@
  *   confirm / cancel / timeout.
  */
 
+import { resolve, sep } from "node:path";
+
 export const PREVIEW_TIMEOUT_MS = 60_000;
 
 /** Tools that never modify state — they bypass the preview gate. */
@@ -20,15 +22,31 @@ export const READ_ONLY_TOOLS = new Set(["read", "grep", "find", "ls"]);
 // substitutions or unknown commands) counts as a write and asks for confirmation.
 const READ_ONLY_COMMANDS = new Set([
   "ls", "cat", "pwd", "head", "tail", "wc", "echo", "which", "grep", "rg", "file", "stat", "du", "df", "date", "whoami",
+  "cd", "sort", "uniq", "cut", "tr", "tree",
 ]);
-const READ_ONLY_GIT = new Set(["status", "log", "diff", "show", "branch", "remote", "rev-parse"]);
+const READ_ONLY_GIT = new Set([
+  "status", "log", "diff", "show", "branch", "remote", "rev-parse",
+  "ls-files", "ls-tree", "blame", "show-ref", "describe",
+]);
+// These only print their version when given just a version flag
+const VERSION_COMMANDS = new Set(["node", "npm", "python", "python3", "git"]);
+// find can delete or run things with these flags; without them it only lists
+const FIND_WRITE_FLAGS = /\s-(delete|exec|execdir|ok|okdir|fprint\w*)\b/;
 
 function isReadOnlyShell(command: string): boolean {
-  if (/[>`]|\$\(/.test(command)) return false; // redirects and substitutions can write
-  const parts = command.split(/\s*(?:\|\||&&|;|\|)\s*/).filter(Boolean);
+  // Discarding output to /dev/null, or merging stderr into stdout (2>&1), writes no file,
+  // so these don't count as redirects
+  const withoutHarmless = command
+    .replace(/\s*2?>{1,2}\s*\/dev\/null/g, "")
+    .replace(/\s*2>&1/g, "");
+  if (/[>`]|\$\(/.test(withoutHarmless)) return false; // redirects and substitutions can write
+  const parts = withoutHarmless.split(/\s*(?:\|\||&&|;|\|)\s*/).filter(Boolean);
   return parts.length > 0 && parts.every((part) => {
     const [cmd, sub] = part.trim().split(/\s+/);
     if (cmd === "git") return READ_ONLY_GIT.has(sub ?? "");
+    if (cmd === "find") return !FIND_WRITE_FLAGS.test(part);
+    // Asking for a version only prints it
+    if (VERSION_COMMANDS.has(cmd)) return sub === "-v" || sub === "--version" || sub === "-V";
     return READ_ONLY_COMMANDS.has(cmd);
   });
 }
@@ -39,6 +57,19 @@ export function isWriteTool(toolName: string, args: ToolArgs = {}): boolean {
     return !(command && isReadOnlyShell(command));
   }
   return !READ_ONLY_TOOLS.has(toolName);
+}
+
+/**
+ * True for a file edit or new file whose path is inside the project folder.
+ * Shell commands never count (they can write anywhere), and neither does a path outside the project.
+ */
+export function isProjectEdit(toolName: string, args: ToolArgs, cwd: string): boolean {
+  if (toolName !== "edit" && toolName !== "write") return false;
+  const target = str(args.path) ?? str(args.file_path) ?? str(args.filePath);
+  if (!target || !cwd) return false;
+  const root = resolve(cwd);
+  const full = resolve(root, target);
+  return full === root || full.startsWith(root + sep);
 }
 
 /** Instruction used to elicit a step-by-step plan from the agent. */
