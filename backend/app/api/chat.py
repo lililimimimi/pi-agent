@@ -31,6 +31,7 @@ from app.sessions import store as session_store
 from app.sessions.models import MessageRecord
 from app.rules.engine import RulesEngine
 from app.services.catalog import is_lasting_failure, record_model_status
+from app.services.project_rename import mark_done, mark_running
 from app.logging import get_logger, get_correlation_id, new_correlation_id, set_correlation_id
 
 log = get_logger(__name__)
@@ -48,6 +49,7 @@ class _Session:
         model: str,
         persist_id: str = "",
         execution_preview: bool = True,
+        auto_edits: bool = False,
         rules: str = "",
         project_path: str = "",
         cid: str = "",
@@ -57,6 +59,7 @@ class _Session:
         self.model = model
         self.persist_id = persist_id
         self.execution_preview = execution_preview
+        self.auto_edits = auto_edits
         self.rules = rules
         self.project_path = project_path
         # Same correlation ID as the create request, so the whole chat can be followed
@@ -135,6 +138,7 @@ class ChatRequest(BaseModel):
     model: str = "mock-1"
     persist_id: str = ""
     execution_preview: bool = True
+    auto_edits: bool = False
     project_path: str = ""
 
 
@@ -181,6 +185,7 @@ async def create_chat(req: ChatRequest) -> dict[str, str]:
         model=req.model,
         persist_id=persist_id,
         execution_preview=req.execution_preview,
+        auto_edits=req.auto_edits,
         rules=rules,
         project_path=req.project_path,
         cid=get_correlation_id(),
@@ -216,6 +221,7 @@ async def stream_chat(session_id: str) -> StreamingResponse:
                     "provider": session.provider,
                     "model": session.model,
                     "execution_preview": session.execution_preview,
+                    "auto_edits": session.auto_edits,
                     "rules": session.rules,
                     "cwd": session.project_path,
                     "cid": session.cid,
@@ -272,8 +278,17 @@ async def stream_chat(session_id: str) -> StreamingResponse:
             except FileNotFoundError:
                 pass
 
+    async def _guarded() -> AsyncIterator[str]:
+        # While a turn streams, its project can't be renamed (see project_rename)
+        mark_running(session.project_path)
+        try:
+            async for chunk in _proxy():
+                yield chunk
+        finally:
+            mark_done(session.project_path)
+
     return StreamingResponse(
-        _proxy(),
+        _guarded(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
     )

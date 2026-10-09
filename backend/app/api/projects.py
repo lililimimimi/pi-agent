@@ -18,6 +18,7 @@ from pydantic import BaseModel
 import json
 from pathlib import Path
 
+from app.services.project_rename import RenameError, rename_project
 from app.sessions import store
 from app.sessions.models import Project
 
@@ -43,6 +44,23 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 class CreateProjectRequest(BaseModel):
     path: str
     name: str = ""
+
+
+class RenameProjectRequest(BaseModel):
+    name: str
+
+
+@router.post("/{project_id}/rename", response_model=Project)
+async def rename_project_route(project_id: str, req: RenameProjectRequest):
+    """Rename the project's folder, and its record and sessions. Pi's own projects can't be renamed."""
+    if project_id.startswith("pi-native:"):
+        raise HTTPException(status_code=400, detail="Projects found in Pi's folders cannot be renamed here")
+    try:
+        return rename_project(project_id, req.name)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except RenameError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("", response_model=list[Project])
