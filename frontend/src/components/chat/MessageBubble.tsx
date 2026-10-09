@@ -42,16 +42,16 @@ function CodeBlock({ children }: { children: ReactNode }) {
   }, [children])
 
   return (
-    <div className="group/code relative my-2 rounded-xl overflow-hidden">
+    <div className="group/code relative my-2 overflow-hidden rounded-md bg-zinc-950">
       {/* Language label bar */}
       {lang && (
-        <div className="flex items-center justify-between bg-zinc-800 px-4 py-1.5">
+        <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-3 py-1.5">
           <span className="text-xs font-mono text-zinc-400">{lang}</span>
         </div>
       )}
       <pre className={cn(
-        'px-4 py-3.5 overflow-x-auto text-sm leading-relaxed',
-        lang ? 'bg-zinc-950' : 'bg-foreground/[0.05]',
+        'overflow-x-auto px-4 py-3 text-sm leading-relaxed',
+        lang ? '' : 'bg-foreground/[0.05]',
       )}>
         {children}
       </pre>
@@ -90,7 +90,7 @@ function ListBlock({ children }: { children: ReactNode }) {
   }, [children])
 
   return (
-    <div className="group/list relative rounded-xl border border-border bg-white/60 px-4 py-3 my-1">
+    <div className="group/list relative my-1 rounded-md border border-border/40 px-4 py-3">
       <button
         type="button"
         onClick={handleCopy}
@@ -199,7 +199,7 @@ const assistantComponents: Components = {
 
   // Table
   table: ({ children }) => (
-    <div className="my-2 overflow-x-auto rounded-xl border border-border">
+    <div className="my-2 overflow-x-auto rounded-md border border-border/40">
       <table className="w-full text-sm border-collapse">{children}</table>
     </div>
   ),

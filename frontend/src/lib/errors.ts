@@ -19,10 +19,24 @@ const RULES: Array<{ test: RegExp; title: string }> = [
     title: 'Cannot reach the local service. Check that pi-bridge and the backend are running.' },
 ]
 
+/** Pulls the human sentence out of a provider's JSON error, if there is one. */
+function readableDetail(raw: string): string {
+  const match = raw.match(/"message":"((?:[^"\\]|\\.)*)"/)
+  if (match) {
+    try {
+      return JSON.parse(`"${match[1]}"`) as string
+    } catch {
+      // not valid JSON text; fall through to the raw message
+    }
+  }
+  return raw
+}
+
 export function friendlyError(raw: string): FriendlyError {
   const rule = RULES.find((r) => r.test.test(raw))
+  const detail = readableDetail(raw)
   return {
     title: rule?.title ?? 'Something went wrong.',
-    detail: raw.length > 300 ? `${raw.slice(0, 300)}…` : raw,
+    detail: detail.length > 300 ? `${detail.slice(0, 300)}…` : detail,
   }
 }

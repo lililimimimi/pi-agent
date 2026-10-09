@@ -2,11 +2,15 @@ import { describe, it, expect } from 'vitest'
 import { friendlyError } from '../errors'
 
 describe('friendlyError', () => {
-  it('explains a usage limit in plain words and keeps the raw text', () => {
+  it('explains a usage limit in plain words and shows the provider sentence, not the JSON', () => {
     const raw = '400 {"type":"error","error":{"message":"You\'re out of extra usage."}}'
     const e = friendlyError(raw)
     expect(e.title).toMatch(/out of usage/)
-    expect(e.detail).toBe(raw)
+    expect(e.detail).toBe("You're out of extra usage.")
+  })
+
+  it('keeps the raw text when there is no JSON message', () => {
+    expect(friendlyError('Codex error: plain text').detail).toBe('Codex error: plain text')
   })
 
   it('explains a rejected key', () => {
