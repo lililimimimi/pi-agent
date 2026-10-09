@@ -119,3 +119,25 @@ describe('deleteProject', () => {
     expect(api.deleteProjectApi).toHaveBeenCalledWith('proj-rules', { deleteSessions: true, deleteFolder: true })
   })
 })
+
+describe('opening a session with a saved failed turn', () => {
+  it('shows the failed turn as an error message, not as a reply', async () => {
+    const { fetchSession } = await import('@/services/api')
+    vi.mocked(fetchSession).mockResolvedValueOnce([
+      { type: 'message', role: 'user', content: 'hello' },
+      { type: 'message', role: 'assistant', content: 'Error: out of extra usage' },
+    ] as never)
+
+    useChatStore.setState({
+      sessions: [
+        { id: 'ses-general', title: 'New Conversation', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: null },
+        { id: 'ses-chat', title: 'hello', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: 'persist-chat' },
+      ],
+    })
+    await useChatStore.getState().switchSession('ses-chat')
+
+    const last = useChatStore.getState().messages.at(-1)
+    expect(last?.error).toBe('out of extra usage')
+    expect(last?.content).toBe('')
+  })
+})

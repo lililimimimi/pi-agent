@@ -63,11 +63,15 @@ function recordsToMessages(records: any[]): Message[] {
   let counter = 0
   return records
     .filter((r: any) => r.type === 'message')
-    .map((r: any) => ({
-      id: `restored-${++counter}`,
-      role: r.role as 'user' | 'assistant',
-      content: stripImageMarker(r.content || ''),
-    }))
+    .map((r: any): Message => {
+      const id = `restored-${++counter}`
+      const content: string = r.content || ''
+      // A failed turn is saved as "Error: <text>"; show it as an error, not as a reply
+      if (r.role === 'assistant' && content.startsWith('Error: ')) {
+        return { id, role: 'assistant', content: '', error: content.slice('Error: '.length) }
+      }
+      return { id, role: r.role as 'user' | 'assistant', content: stripImageMarker(content) }
+    })
 }
 
 // ── Permission request ────────────────────────────────────────────────────────
@@ -278,15 +282,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     let loadedMessages = target.messages
     if (target.persistId && target.messages.length === 0) {
       try {
-        const records = await fetchSession(target.persistId)
-        let msgCounter = 0
-        loadedMessages = records
-          .filter((r: any) => r.type === 'message')
-          .map((r: any) => ({
-            id: `restored-${++msgCounter}`,
-            role: r.role as 'user' | 'assistant',
-            content: stripImageMarker(r.content || ''),
-          }))
+        loadedMessages = recordsToMessages(await fetchSession(target.persistId))
       } catch {
         // ignore
       }
@@ -492,10 +488,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       // Only the message being sent carries its images; earlier images are not re-sent
       const allMessages = get().messages
-      const history = allMessages.map((m, i) => ({
-        role: m.role,
-        content: toApiContent(m, i === allMessages.length - 1),
-      }))
+      // Failed turns are not part of the conversation the model should see
+      const history = allMessages
+        .filter((m) => !m.error)
+        .map((m, i) => ({
+          role: m.role,
+          content: toApiContent(m, i === allMessages.length - 1),
+        }))
       const { provider, model, sessions, activeId } = get()
       const currentSession = sessions.find((s) => s.id === activeId)
       // The active project's folder; General has none, so the bridge uses the home folder
@@ -570,9 +569,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
             set({ executionPreview: ep })
             break
           }
-          case 'error':
-            set({ error: event.data.message, agentStatus: 'idle' as const })
+          case 'error': {
+            // Drop the empty reply placeholder, so a failed turn leaves no blank bubble
+            const last = messages[messages.length - 1]
+            const empty = last?.role === 'assistant' && !last.content && !last.toolCalls?.length
+            set({
+              messages: empty ? messages.slice(0, -1) : messages,
+              error: event.data.message,
+              agentStatus: 'idle' as const,
+            })
             break
+          }
           case 'done':
             set({ agentStatus: 'idle' as const })
             break

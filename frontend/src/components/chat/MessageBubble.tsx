@@ -6,6 +6,7 @@ import { Copy, Check, ChevronRight } from 'lucide-react'
 import { ToolCallCard } from '@/components/chat/ToolCallCard'
 import type { Message, ToolCall, ToolResult } from '@/types'
 import { cn } from '@/lib/utils'
+import { friendlyError } from '@/lib/errors'
 
 function extractText(node: ReactNode): string {
   if (typeof node === 'string') return node
@@ -233,6 +234,19 @@ const assistantComponents: Components = {
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user'
+
+  // A failed turn restored from the session file: same look as the live error banner
+  if (message.error) {
+    const friendly = friendlyError(message.error)
+    return (
+      <div className="flex justify-start">
+        <div className="w-full rounded-2xl border border-destructive/15 bg-destructive/8 px-5 py-3 text-destructive">
+          <p className="text-base font-medium">{friendly.title}</p>
+          <p className="mt-1 break-all text-xs opacity-70">{friendly.detail}</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>

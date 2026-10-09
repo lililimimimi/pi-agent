@@ -33,6 +33,8 @@ export type Message = {
   toolCalls?: ToolCall[]
   toolResults?: ToolResult[]
   images?: ImageAttachment[]
+  /** Set on a failed turn restored from the session file: the raw error text */
+  error?: string
 }
 
 // ── SSE event types from backend ──

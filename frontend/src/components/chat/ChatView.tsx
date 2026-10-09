@@ -3,7 +3,7 @@ import { MessageBubble } from '@/components/chat/MessageBubble'
 import { ExecutionPreviewCard } from '@/components/chat/ExecutionPreviewCard'
 import { useChatStore } from '@/stores/chatStore'
 import { useToast } from '@/components/Toast'
-
+import { friendlyError } from '@/lib/errors'
 
 export function ChatView() {
   const messages = useChatStore((s) => s.messages)
@@ -31,9 +31,11 @@ export function ChatView() {
   // Show toast on new errors
   useEffect(() => {
     if (error && error !== prevErrorRef.current) {
+      const friendly = friendlyError(error)
       showToast({
         type: 'error',
-        message: error,
+        message: friendly.title,
+        detail: friendly.detail,
         onRetry: lastUserMsg ? () => sendMessage(lastUserMsg) : undefined,
       })
     }
@@ -74,8 +76,9 @@ export function ChatView() {
         )}
 
         {error && (
-          <div className="bg-destructive/8 text-destructive text-sm rounded-2xl px-5 py-3 border border-destructive/15">
-            {error}
+          <div className="rounded-2xl border border-destructive/15 bg-destructive/8 px-5 py-3 text-destructive">
+            <p className="text-base font-medium">{friendlyError(error).title}</p>
+            <p className="mt-1 break-all text-xs opacity-70">{friendlyError(error).detail}</p>
           </div>
         )}
 

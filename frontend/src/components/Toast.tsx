@@ -18,6 +18,7 @@ interface ToastItem {
   id: string
   type: ToastType
   message: string
+  detail?: string
   duration: number
   onRetry?: () => void
 }
@@ -25,6 +26,8 @@ interface ToastItem {
 interface ShowToastOptions {
   type: ToastType
   message: string
+  /** Optional small line under the message, e.g. the raw error text */
+  detail?: string
   duration?: number
   onRetry?: () => void
 }
@@ -110,7 +113,7 @@ function Toast({ toast, onDismiss }: ToastProps) {
       role="alert"
       onClick={dismiss}
       className={cn(
-        "pointer-events-auto flex w-full max-w-[400px] cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 shadow-lg backdrop-blur-md transition-all duration-300 ease-out",
+        "pointer-events-auto flex w-full max-w-[480px] cursor-pointer items-center gap-4 rounded-2xl border px-5 py-4 shadow-lg backdrop-blur-md transition-all duration-300 ease-out",
         BG_MAP[toast.type],
         visible && !exiting
           ? "translate-y-0 opacity-100"
@@ -119,9 +122,16 @@ function Toast({ toast, onDismiss }: ToastProps) {
     >
       <Icon className={cn("size-5 shrink-0", COLOR_MAP[toast.type])} />
 
-      <p className="min-w-0 flex-1 text-sm font-medium text-gray-800">
-        {toast.message}
-      </p>
+      <div className="min-w-0 flex-1">
+        <p className="text-base font-medium leading-snug text-gray-900">
+          {toast.message}
+        </p>
+        {toast.detail && (
+          <p className="mt-1 line-clamp-2 break-all text-xs text-gray-500" title={toast.detail}>
+            {toast.detail}
+          </p>
+        )}
+      </div>
 
       {toast.type === "error" && toast.onRetry && (
         <button
@@ -185,6 +195,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       id,
       type: options.type,
       message: options.message,
+      detail: options.detail,
       duration: options.duration ?? DEFAULT_DURATION,
       onRetry: options.onRetry,
     }
