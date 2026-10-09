@@ -29,6 +29,7 @@ export function AddProjectModal({ open, onClose }: Props) {
     setCreatingFolder(false)
     setNewFolderName('')
     setNewFolderError('')
+    setNewFolderLoading(false)
     try {
       const data = await browseDirs(path)
       setBrowseData(data)
@@ -80,6 +81,7 @@ export function AddProjectModal({ open, onClose }: Props) {
       setNewFolderName('')
     } catch (e) {
       setNewFolderError(e instanceof Error ? e.message : 'Failed to create folder')
+    } finally {
       setNewFolderLoading(false)
     }
   }

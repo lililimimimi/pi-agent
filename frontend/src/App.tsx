@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChatView } from '@/components/chat/ChatView'
 import { InputBar } from '@/components/chat/InputBar'
 import { ModelSelector } from '@/components/model/ModelSelector'
@@ -23,6 +23,68 @@ function WorkingDirectory() {
       {path ?? '~ (home)'}
     </span>
   )
+}
+
+// Draws a red dot on the page's tab icon, or puts the original icon back
+function setFaviconDot(on: boolean) {
+  const link = document.querySelector<HTMLLinkElement>("link[rel~='icon']")
+  if (!link) return
+  if (!link.dataset.original) link.dataset.original = link.href
+  const original = link.dataset.original
+  if (!on) {
+    link.href = original
+    return
+  }
+  const img = new Image()
+  img.onload = () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 32
+    canvas.height = 32
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(img, 0, 0, 32, 32)
+    ctx.beginPath()
+    ctx.arc(24, 8, 7, 0, Math.PI * 2)
+    ctx.fillStyle = '#ef4444'
+    ctx.fill()
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 2
+    ctx.stroke()
+    link.href = canvas.toDataURL('image/png')
+  }
+  img.src = original
+}
+
+// True when a reply finished while the page was not in front; cleared when the user comes back
+function useReplyDoneDot(): boolean {
+  const isStreaming = useChatStore((s) => s.isStreaming)
+  const [done, setDone] = useState(false)
+  const wasStreaming = useRef(false)
+
+  useEffect(() => {
+    if (wasStreaming.current && !isStreaming && (document.hidden || !document.hasFocus())) {
+      setDone(true)
+    }
+    wasStreaming.current = isStreaming
+  }, [isStreaming])
+
+  useEffect(() => {
+    const clear = () => {
+      if (!document.hidden && document.hasFocus()) setDone(false)
+    }
+    document.addEventListener('visibilitychange', clear)
+    window.addEventListener('focus', clear)
+    return () => {
+      document.removeEventListener('visibilitychange', clear)
+      window.removeEventListener('focus', clear)
+    }
+  }, [])
+
+  useEffect(() => {
+    setFaviconDot(done)
+  }, [done])
+
+  return done
 }
 
 function ActiveApprovalModal() {
@@ -52,6 +114,7 @@ export function App() {
   const newSession = useChatStore((s) => s.newSession)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  useReplyDoneDot()
 
   const isEmpty = messages.length === 0
 

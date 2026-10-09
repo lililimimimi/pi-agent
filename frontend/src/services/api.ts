@@ -19,12 +19,16 @@ export async function createChat(
   model = 'mock-1',
   persistId?: string,
   projectPath?: string,
+  autoEdits = false,
 ): Promise<{ session_id: string; persist_id: string }> {
   const res = await fetch(`${BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    // project_path lets the backend add that project's rules to the prompt
-    body: JSON.stringify({ messages, provider, model, persist_id: persistId ?? '', project_path: projectPath ?? '' }),
+    // project_path lets the backend add that project's rules to the prompt;
+    // auto_edits lets file edits inside the project run without a confirmation
+    body: JSON.stringify({
+      messages, provider, model, persist_id: persistId ?? '', project_path: projectPath ?? '', auto_edits: autoEdits,
+    }),
   })
   if (!res.ok) throw new Error(`Failed to create chat: ${res.status}`)
   return await res.json()
@@ -242,6 +246,20 @@ export type ProjectData = {
 export async function fetchProjects(): Promise<ProjectData[]> {
   const res = await fetch(`${BASE}/projects`)
   if (!res.ok) throw new Error(`Failed to fetch projects: ${res.status}`)
+  return await res.json()
+}
+
+/** Renames the project's folder on disk, and its record and sessions. Throws with the reason if refused. */
+export async function renameProjectApi(id: string, name: string): Promise<ProjectData> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(id)}/rename`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ detail: 'Unknown error' }))
+    throw new Error(data.detail || `Failed: ${res.status}`)
+  }
   return await res.json()
 }
 

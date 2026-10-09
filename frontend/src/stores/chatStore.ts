@@ -108,6 +108,9 @@ type ChatState = {
   // Execution preview
   executionPreview: ExecutionPreview | null
   clearExecutionPreview: () => void
+  /** When on, file edits inside the project run without asking. Off after every reload. */
+  autoEdits: boolean
+  setAutoEdits: (on: boolean) => void
 
   // Permission requests & agent status
   permissionRequests: Map<string, PermissionRequest>
@@ -125,7 +128,7 @@ type ChatState = {
   // Project actions
   addProject: (name: string, path?: string) => void
   loadPersistedProjects: () => Promise<void>
-  renameProject: (id: string, name: string) => void
+  renameProject: (id: string, name: string, path?: string) => void
   deleteProject: (id: string, deleteFolder?: boolean) => void
   switchProject: (id: string) => void
   restoreLastView: () => Promise<void>
@@ -167,6 +170,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   executionPreview: null,
   clearExecutionPreview: () => set({ executionPreview: null }),
+  autoEdits: false,
+  setAutoEdits: (on) => set({ autoEdits: on }),
 
   permissionRequests: new Map(),
   agentStatus: 'idle',
@@ -397,8 +402,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     })
   },
 
-  renameProject: (id, name) => {
-    set((s) => ({ projects: s.projects.map((p) => p.id === id ? { ...p, name } : p) }))
+  renameProject: (id, name, path) => {
+    set((s) => ({ projects: s.projects.map((p) => p.id === id ? { ...p, name, ...(path ? { path } : {}) } : p) }))
   },
 
   deleteProject: (id, deleteFolder = false) => {
@@ -499,7 +504,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const currentSession = sessions.find((s) => s.id === activeId)
       // The active project's folder; General has none, so the bridge uses the home folder
       const projectPath = get().projects.find((p) => p.id === get().activeProjectId)?.path
-      const result = await createChat(history, provider, model, currentSession?.persistId ?? undefined, projectPath)
+      const result = await createChat(history, provider, model, currentSession?.persistId ?? undefined, projectPath, get().autoEdits)
       const sessionId = result.session_id
       const persistId = result.persist_id
       set({ sessionId })

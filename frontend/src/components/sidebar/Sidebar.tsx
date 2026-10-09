@@ -8,7 +8,7 @@ import {
   Plus, Settings, MessageSquare, Folder, FolderOpen,
   MoreHorizontal, Pencil, Trash2, Check, FolderPlus, Search, FolderOpen as RevealIcon,
 } from 'lucide-react'
-import { revealSessionFile, revealProjectFolder } from '@/services/api'
+import { revealSessionFile, revealProjectFolder, renameProjectApi } from '@/services/api'
 import { useToast } from '@/components/Toast'
 import { DeleteProjectDialog } from '@/components/sidebar/DeleteProjectDialog'
 import { isHiddenAutoProject } from '@/lib/projects'
@@ -176,6 +176,15 @@ function SessionRow({
 function ProjectRow({ project, isActive }: { project: { id: string; name: string; path?: string }; isActive: boolean }) {
   const switchProject = useChatStore((s) => s.switchProject)
   const renameProject = useChatStore((s) => s.renameProject)
+  // Renames the folder on disk too; the list only changes once the backend has done it
+  const handleRename = (name: string) => {
+    setRenaming(false)
+    const next = name.trim()
+    if (!next || next === project.name) return
+    renameProjectApi(project.id, next)
+      .then((saved) => renameProject(project.id, saved.name, saved.path))
+      .catch((err: Error) => showToast({ type: 'error', message: err.message }))
+  }
   const deleteProject = useChatStore((s) => s.deleteProject)
   const { showToast } = useToast()
   const sessionCountFor = (id: string) => useChatStore.getState().sessions.filter((x) => x.projectId === id).length
@@ -213,7 +222,7 @@ function ProjectRow({ project, isActive }: { project: { id: string; name: string
       {renaming ? (
         <RenameInput
           value={project.name}
-          onCommit={(v) => { renameProject(project.id, v); setRenaming(false) }}
+          onCommit={handleRename}
           onCancel={() => setRenaming(false)}
         />
       ) : (
