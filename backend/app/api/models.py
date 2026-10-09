@@ -14,7 +14,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.config.providers import known_provider
+from app.config.store import known_provider
 from app.services.bridge import BridgeError, bridge_call
 from app.services.catalog import build_catalog, enabled_models, run_model_test, save_enabled_models
 

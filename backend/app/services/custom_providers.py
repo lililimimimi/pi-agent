@@ -5,7 +5,8 @@ import re
 import uuid
 from typing import Any
 
-from app.config.providers import CUSTOM_PREFIX, load_config, save_config, update_provider_config
+from app.config.meta import CUSTOM_PREFIX
+from app.config.store import load_config, save_config, update_provider_config
 from app.services.discovery import discover_models
 
 

@@ -23,10 +23,10 @@ from app.logging import setup_logging
 setup_logging(level=os.getenv("LOG_LEVEL", "DEBUG"))
 
 # Sync Pi CLI OAuth + env-var API keys → config.json (used by the model settings UI)
-from app.config.providers import sync_env_vars_to_config, sync_pi_oauth_to_config  # noqa: E402
+from app.config.sync import sync_env_vars_to_config, sync_pi_oauth_to_config  # noqa: E402
 sync_pi_oauth_to_config()   # Pi CLI OAuth (Claude.ai 订阅)
 sync_env_vars_to_config()   # env vars (ANTHROPIC_API_KEY 等)
-from app.config.providers import sync_codex_login_to_config  # noqa: E402
+from app.config.sync import sync_codex_login_to_config  # noqa: E402
 sync_codex_login_to_config()  # OpenAI subscription login (Pi auth.json)
 
 # --------------------------------------------------------------------------- #

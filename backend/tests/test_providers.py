@@ -29,17 +29,17 @@ def make_config_path(tmp_path: Path) -> Path:
 
 
 def test_mask_key_empty():
-    from app.config.providers import mask_key
+    from app.config.store import mask_key
     assert mask_key("") == ""
 
 
 def test_mask_key_short():
-    from app.config.providers import mask_key
+    from app.config.store import mask_key
     assert mask_key("abc") == "****"
 
 
 def test_mask_key_normal():
-    from app.config.providers import mask_key
+    from app.config.store import mask_key
     result = mask_key("sk-ant-api03-xxxx")
     assert result.startswith("sk-ant-a")
     assert result.endswith("****")
@@ -48,12 +48,13 @@ def test_mask_key_normal():
 
 def test_load_config_default(tmp_path: Path, monkeypatch):
     """load_config should return defaults for all 5 providers when no file exists."""
-    from app.config import providers as pmod
+    from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.providers import load_config, PROVIDER_IDS
+    from app.config.store import load_config
+    from app.config.meta import PROVIDER_IDS
     cfg = load_config()
     assert "providers" in cfg
     for pid in PROVIDER_IDS:
@@ -62,12 +63,12 @@ def test_load_config_default(tmp_path: Path, monkeypatch):
 
 def test_save_and_load_config(tmp_path: Path, monkeypatch):
     """save_config + load_config roundtrip."""
-    from app.config import providers as pmod
+    from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.providers import load_config, save_config
+    from app.config.store import load_config, save_config
 
     cfg = load_config()
     cfg["providers"]["anthropic"]["api_key"] = "sk-ant-test-key"
@@ -80,12 +81,12 @@ def test_save_and_load_config(tmp_path: Path, monkeypatch):
 
 
 def test_update_provider_config(tmp_path: Path, monkeypatch):
-    from app.config import providers as pmod
+    from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.providers import update_provider_config, get_provider_config
+    from app.config.store import update_provider_config, get_provider_config
 
     update_provider_config("deepseek", {"api_key": "sk-ds-key", "enabled": True})
     p = get_provider_config("deepseek")
@@ -94,12 +95,12 @@ def test_update_provider_config(tmp_path: Path, monkeypatch):
 
 
 def test_all_providers_masked_hides_keys(tmp_path: Path, monkeypatch):
-    from app.config import providers as pmod
+    from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.providers import update_provider_config, all_providers_masked
+    from app.config.store import update_provider_config, all_providers_masked
 
     update_provider_config("openai", {"api_key": "sk-openai-real-secret", "enabled": True})
     providers = all_providers_masked()
@@ -110,12 +111,13 @@ def test_all_providers_masked_hides_keys(tmp_path: Path, monkeypatch):
 
 
 def test_all_providers_masked_returns_all_five(tmp_path: Path, monkeypatch):
-    from app.config import providers as pmod
+    from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.providers import all_providers_masked, PROVIDER_IDS
+    from app.config.store import all_providers_masked
+    from app.config.meta import PROVIDER_IDS
 
     result = all_providers_masked()
     ids = {p["id"] for p in result}
@@ -125,7 +127,7 @@ def test_all_providers_masked_returns_all_five(tmp_path: Path, monkeypatch):
 @pytest.fixture()
 def client(tmp_path: Path, monkeypatch):
     """TestClient with patched config path."""
-    from app.config import providers as pmod
+    from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
@@ -148,12 +150,12 @@ def test_list_providers_returns_all(client: TestClient):
 
 
 def test_list_providers_masks_keys(client: TestClient, tmp_path: Path, monkeypatch):
-    from app.config import providers as pmod
+    from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.providers import update_provider_config
+    from app.config.store import update_provider_config
     update_provider_config("deepseek", {"api_key": "sk-deepseek-real-secret"})
 
     from app.main import app
@@ -187,12 +189,12 @@ def test_get_models_empty(client: TestClient):
 
 
 def test_get_models_with_cache(client: TestClient, tmp_path: Path, monkeypatch):
-    from app.config import providers as pmod
+    from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.providers import update_provider_config
+    from app.config.store import update_provider_config
     update_provider_config("anthropic", {"models": ["claude-3-haiku", "claude-opus-4-5"]})
 
     from app.main import app
@@ -244,12 +246,12 @@ def test_test_provider_anthropic_no_key(client: TestClient):
 
 
 def test_test_provider_anthropic_with_key(client: TestClient, tmp_path: Path, monkeypatch):
-    from app.config import providers as pmod
+    from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.providers import update_provider_config
+    from app.config.store import update_provider_config
     update_provider_config("anthropic", {"api_key": "sk-ant-test-key"})
 
     mock_response = MagicMock()
@@ -275,12 +277,12 @@ def test_test_provider_anthropic_with_key(client: TestClient, tmp_path: Path, mo
 
 def test_test_provider_http_error(client: TestClient, tmp_path: Path, monkeypatch):
     """Provider returns HTTP 403 → ok=False with error message."""
-    from app.config import providers as pmod
+    from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.providers import update_provider_config
+    from app.config.store import update_provider_config
     update_provider_config("deepseek", {"api_key": "sk-bad-key"})
 
     import httpx as httpx_mod

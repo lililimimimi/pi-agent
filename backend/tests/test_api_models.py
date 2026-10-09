@@ -16,7 +16,7 @@ from app.main import app
 def cfg_file(tmp_path: Path, monkeypatch) -> Path:
     """Use a temporary config.json so tests never touch the real one."""
     path = tmp_path / "config.json"
-    monkeypatch.setattr("app.config.providers._config_path", lambda: path)
+    monkeypatch.setattr("app.config.store._config_path", lambda: path)
     return path
 
 

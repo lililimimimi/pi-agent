@@ -4,7 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from app.config.providers import PROVIDER_IDS, PROVIDER_META, load_config, update_provider_config, known_provider
+from app.config.meta import PROVIDER_IDS, PROVIDER_META
+from app.config.store import load_config, update_provider_config, known_provider
 from app.services.bridge import BridgeError, bridge_call, bridge_models
 
 

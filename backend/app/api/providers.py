@@ -19,14 +19,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.config.providers import (
-    all_providers_masked,
-    get_provider_config,
-    known_provider,
-    sync_codex_login_to_config,
-    sync_pi_oauth_to_config,
-    update_provider_config,
-)
+from app.config.store import all_providers_masked, get_provider_config, known_provider, update_provider_config
+from app.config.sync import sync_codex_login_to_config, sync_pi_oauth_to_config
 from app.services.bridge import BridgeError, bridge_call
 from app.services.custom_providers import add_custom_provider, remove_custom_provider
 from app.services.discovery import discover_models

@@ -5,12 +5,11 @@ Each provider has its own endpoint and auth; the result is (models, error).
 """
 from __future__ import annotations
 
-import time
 from typing import Any
 
 import httpx
 
-from app.config.providers import CUSTOM_PREFIX
+from app.config.meta import CUSTOM_PREFIX
 
 
 # ---------------------------------------------------------------------------
