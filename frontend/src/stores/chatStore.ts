@@ -38,7 +38,7 @@ const nextProjectId = () => `proj-${++projectCounter}`
 const makeProject = (name: string): Project => ({ id: nextProjectId(), name })
 const makeSession = (projectId: string): SessionSnapshot => ({
   id: nextSessionId(),
-  title: 'New Conversation',
+  title: 'New',
   projectId,
   messages: [],
   tokenUsage: { inputTokens: 0, outputTokens: 0 },
@@ -478,7 +478,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Auto-title from first user message
     const { sessions, activeId } = get()
     const cur = sessions.find((s) => s.id === activeId)
-    if (cur && cur.title === 'New Conversation') {
+    if (cur && cur.title === 'New') {
       set({ sessions: sessions.map((s) => s.id === activeId ? { ...s, title: content.slice(0, 40).trim() } : s) })
     }
 

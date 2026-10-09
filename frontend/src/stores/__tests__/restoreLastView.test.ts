@@ -27,7 +27,7 @@ beforeEach(() => {
     ],
     activeProjectId: 'proj-general',
     sessions: [
-      { id: 'ses-general', title: 'New Conversation', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: null },
+      { id: 'ses-general', title: 'New', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: null },
       { id: 'ses-rules', title: 'hello', projectId: 'proj-rules', messages: [{ id: 'm1', role: 'user', content: 'hello' }], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: 'persist-rules' },
     ],
     activeId: 'ses-general',
@@ -87,7 +87,7 @@ describe('restoreLastView with a single session in the project', () => {
 
     useChatStore.setState({
       sessions: [
-        { id: 'ses-general', title: 'New Conversation', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: null },
+        { id: 'ses-general', title: 'New', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: null },
         { id: 'ses-rules', title: 'hello', projectId: 'proj-rules', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: 'persist-rules' },
       ],
     })
@@ -130,7 +130,7 @@ describe('opening a session with a saved failed turn', () => {
 
     useChatStore.setState({
       sessions: [
-        { id: 'ses-general', title: 'New Conversation', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: null },
+        { id: 'ses-general', title: 'New', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: null },
         { id: 'ses-chat', title: 'hello', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: 'persist-chat' },
       ],
     })
