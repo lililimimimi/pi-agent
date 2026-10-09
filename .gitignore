@@ -1,1 +1,4 @@
 .env
+
+# Logs written by scripts/start.sh
+logs/
