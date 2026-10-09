@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, type ReactNode } from 'react'
+import { memo, useState, useCallback, useRef, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -7,6 +7,9 @@ import { ToolCallCard } from '@/components/chat/ToolCallCard'
 import type { Message, ToolCall, ToolResult } from '@/types'
 import { cn } from '@/lib/utils'
 import { friendlyError } from '@/lib/errors'
+
+// Code without a language label is guessed from these, so the guess stays among common languages
+const HIGHLIGHT_LANGS = ['typescript', 'javascript', 'python', 'bash', 'json', 'css', 'xml', 'markdown', 'sql']
 
 function extractText(node: ReactNode): string {
   if (typeof node === 'string') return node
@@ -27,19 +30,24 @@ function extractLang(node: ReactNode): string {
   return m ? m[1] : ''
 }
 
+// Characters and words that only show up in real code
+const CODE_MARKS = /[{};=()<>]|=>|\b(function|const|let|def|import|return|class)\b/
+
 function CodeBlock({ children }: { children: ReactNode }) {
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
   const lang = extractLang(children)
+  const text = extractText(children)
+  // A language label on text that has no code in it (e.g. a file list labeled "css"): show it plain
+  const plain = lang !== '' && !CODE_MARKS.test(text)
 
   const handleCopy = useCallback(() => {
-    const text = extractText(children)
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => setCopied(false), 1500)
     })
-  }, [children])
+  }, [text])
 
   return (
     <div className="group/code relative my-2 overflow-hidden rounded-md bg-zinc-950">
@@ -50,10 +58,11 @@ function CodeBlock({ children }: { children: ReactNode }) {
         </div>
       )}
       <pre className={cn(
-        'overflow-x-auto px-4 py-3 text-sm leading-relaxed',
-        lang ? '' : 'bg-foreground/[0.05]',
+        'px-4 py-3 text-sm leading-relaxed text-zinc-200',
+        // Unlabeled blocks are usually plain text (file lists, diagrams): wrap them instead of cutting off
+        lang && !plain ? 'overflow-x-auto' : 'whitespace-pre-wrap break-words',
       )}>
-        {children}
+        {plain ? text : children}
       </pre>
       <button
         type="button"
@@ -61,7 +70,7 @@ function CodeBlock({ children }: { children: ReactNode }) {
         className={cn(
           'absolute right-2.5 flex h-6 w-6 items-center justify-center rounded-lg',
           lang ? 'top-9' : 'top-2.5',
-          lang ? 'text-zinc-500 hover:bg-white/10 hover:text-zinc-300' : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground/70',
+          'text-zinc-500 hover:bg-white/10 hover:text-zinc-300',
           'transition-all duration-200',
           'opacity-0 group-hover/code:opacity-100',
           'cursor-pointer',
@@ -90,7 +99,7 @@ function ListBlock({ children }: { children: ReactNode }) {
   }, [children])
 
   return (
-    <div className="group/list relative my-1 rounded-md border border-border/40 px-4 py-3">
+    <div className="group/list relative my-1 rounded-md border-2 border-border bg-background px-4 py-3">
       <button
         type="button"
         onClick={handleCopy}
@@ -149,6 +158,8 @@ function ToolCallGroup({ toolCalls, toolResults }: { toolCalls: ToolCall[]; tool
 
 type MessageBubbleProps = {
   message: Message
+  /** True while this reply is still being written */
+  streaming?: boolean
 }
 
 // Custom renderers for assistant messages
@@ -161,16 +172,20 @@ const assistantComponents: Components = {
     </div>
   ),
   h2: ({ children }) => (
-    <div className="mt-1">
-      <p className="font-semibold text-[14px] tracking-tight text-foreground">{children}</p>
+    <div className="mt-2">
+      <p className="font-semibold text-base tracking-tight text-foreground">{children}</p>
       <div className="mt-1.5 border-b border-foreground/12" />
     </div>
   ),
   h3: ({ children }) => (
     <div className="mt-1">
-      <p className="font-semibold text-sm tracking-tight text-foreground">{children}</p>
+      <p className="font-semibold text-[15px] tracking-tight text-foreground">{children}</p>
       <div className="mt-1 border-b border-foreground/10" />
     </div>
+  ),
+  // Bold labels stand out: full-strength text colour and a heavier weight than the body
+  strong: ({ children }) => (
+    <strong className="font-semibold text-foreground">{children}</strong>
   ),
 
   // Lists: bordered rounded box with copy button
@@ -232,7 +247,41 @@ const assistantComponents: Components = {
   ),
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+// ── Copy button for a user's message (shows on hover) ───────────────────
+function CopyMessageButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  const handleCopy = useCallback(() => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }, [text])
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className={cn(
+        'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg',
+        'text-muted-foreground transition-all duration-200',
+        'opacity-0 group-hover/msg:opacity-100',
+        'hover:bg-foreground/[0.06] hover:text-foreground/70',
+        'cursor-pointer',
+        copied && 'opacity-100 text-green-600 hover:text-green-600',
+      )}
+      aria-label={copied ? 'Copied' : 'Copy message'}
+    >
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  )
+}
+
+// Memoized: while a reply streams, only the last message object changes, so the
+// finished messages above it skip re-rendering and re-parsing their Markdown.
+export const MessageBubble = memo(function MessageBubble({ message, streaming = false }: MessageBubbleProps) {
   const isUser = message.role === 'user'
 
   // A failed turn restored from the session file: same look as the live error banner
@@ -249,7 +298,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   }
 
   return (
-    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
+    <div className={cn('group/msg flex flex-col gap-1', isUser ? 'items-end' : 'items-start')}>
       <div
         className={cn(
           'rounded-2xl px-5 py-4',
@@ -276,7 +325,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             <div className="assistant-prose space-y-3">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight]}
+                // Guessing the language of unlabeled code is slow, so it waits until the reply is finished
+                rehypePlugins={[[rehypeHighlight, { detect: !streaming, subset: HIGHLIGHT_LANGS }]]}
                 components={assistantComponents}
               >
                 {message.content}
@@ -290,6 +340,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <ToolCallGroup toolCalls={message.toolCalls} toolResults={message.toolResults} />
         )}
       </div>
+      {isUser && message.content && <CopyMessageButton text={message.content} />}
     </div>
   )
-}
+})

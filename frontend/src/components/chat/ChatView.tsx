@@ -24,9 +24,10 @@ export function ChatView() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const prevErrorRef = useRef<string | null>(null)
 
+  // While a reply streams, jump instead of animating: a smooth scroll on every token makes it stutter
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    bottomRef.current?.scrollIntoView({ behavior: isStreaming ? 'auto' : 'smooth' })
+  }, [messages, isStreaming])
 
   // Show toast on new errors
   useEffect(() => {
@@ -45,8 +46,12 @@ export function ChatView() {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-6">
       <div className="max-w-2xl mx-auto py-8 space-y-6">
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+        {messages.map((msg, i) => (
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            streaming={isStreaming && i === messages.length - 1}
+          />
         ))}
 
         {executionPreview && (

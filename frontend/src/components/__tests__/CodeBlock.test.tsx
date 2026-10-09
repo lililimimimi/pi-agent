@@ -56,3 +56,27 @@ describe('CodeBlock (via MessageBubble)', () => {
     })
   })
 })
+
+describe('CodeBlock plain-text rule', () => {
+  it('shows a labeled block with no code in it as plain text', () => {
+    const message: Message = {
+      id: '2',
+      role: 'assistant',
+      content: '```css\nM TODO.md\n?? src/App.test.tsx\n```',
+    }
+    render(<MessageBubble message={message} />)
+    const codeEl = document.querySelector('pre')
+    expect(codeEl?.textContent).toContain('?? src/App.test.tsx')
+    expect(codeEl?.querySelector('.hljs-selector-tag, .hljs-attr, .hljs-keyword')).toBeNull()
+  })
+
+  it('still highlights a labeled block that is real code', () => {
+    const message: Message = {
+      id: '3',
+      role: 'assistant',
+      content: '```ts\nconst x: number = 1\n```',
+    }
+    render(<MessageBubble message={message} />)
+    expect(document.querySelector('pre')?.querySelector('[class*="hljs-"]')).not.toBeNull()
+  })
+})
