@@ -8,12 +8,16 @@ import { explainError } from '@/lib/modelStatus'
 
 type Props = {
   group: CatalogGroup
+  /** Whether this provider has its own key or login; models can't be enabled or tested without it */
+  configured: boolean
+  /** Shown above the list while the provider is not configured */
+  unconfiguredHint: string
   /** Called after any change so the parent reloads the catalog */
   onChanged: () => void
 }
 
 // Models of one provider. Collapsed by default; enabled models are listed first.
-export function ProviderModels({ group, onChanged }: Props) {
+export function ProviderModels({ group, configured, unconfiguredHint, onChanged }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [saving, setSaving] = useState(false)
@@ -60,13 +64,16 @@ export function ProviderModels({ group, onChanged }: Props) {
   }
 
   if (group.models.length === 0) {
-    return <p className="text-sm text-muted-foreground">No models found.</p>
+    return <p className="text-base text-muted-foreground">No models found.</p>
   }
 
   return (
-    <Collapsible.Root open={open} onOpenChange={setOpen}>
+    <Collapsible.Root open={open} onOpenChange={setOpen} disabled={!configured}>
+      {!configured && (
+        <p className="mb-1.5 text-base text-muted-foreground">{unconfiguredHint}</p>
+      )}
       <div className="flex items-center justify-between gap-2">
-        <Collapsible.Trigger className="flex items-center gap-1.5 rounded-md px-1 py-0.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+        <Collapsible.Trigger className={`flex items-center gap-1.5 rounded-md px-1 py-0.5 text-base text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${configured ? '' : 'pointer-events-none opacity-50'}`}>
           <ChevronRight className={`size-4 transition-transform ${open ? 'rotate-90' : ''}`} />
           {enabledCount} of {group.models.length} enabled
         </Collapsible.Trigger>
@@ -74,7 +81,7 @@ export function ProviderModels({ group, onChanged }: Props) {
         {open && (
           <div className="flex items-center gap-1">
             {query.trim() && visible.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={enableShown} disabled={saving}>
+              <Button variant="ghost" size="sm" onClick={enableShown} disabled={saving || !configured}>
                 Enable shown
               </Button>
             )}
@@ -94,20 +101,20 @@ export function ProviderModels({ group, onChanged }: Props) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search models"
-            className="h-8 w-full rounded-lg bg-muted/60 pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="h-8 w-full rounded-lg bg-muted/60 pl-8 pr-3 text-base outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
           />
         </div>
 
         <div className="max-h-80 overflow-y-auto">
           {visible.length === 0 && (
-            <p className="py-3 text-sm text-muted-foreground">No models match “{query}”.</p>
+            <p className="py-3 text-base text-muted-foreground">No models match “{query}”.</p>
           )}
           {visible.map((m) => (
             <div key={m.id} className="flex items-center gap-3 py-2 pr-2">
               <Switch.Root
                 checked={m.enabled}
                 onCheckedChange={(on) => setOn(m, on)}
-                disabled={saving}
+                disabled={saving || !configured}
                 aria-label={`Enable ${m.name}`}
                 className="relative inline-flex h-[18px] w-8 shrink-0 items-center rounded-full bg-input transition-colors data-[checked]:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
               >
@@ -116,13 +123,13 @@ export function ProviderModels({ group, onChanged }: Props) {
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-sm" title={m.id}>{m.name}</span>
+                  <span className="truncate text-base" title={m.id}>{m.name}</span>
                   {m.supports_images && (
                     <ImageIcon className="size-3.5 shrink-0 text-muted-foreground" aria-label="Supports images" />
                   )}
                 </div>
                 {m.status && !m.status.ok && (
-                  <p className="truncate text-sm text-muted-foreground" title={m.status.error ?? ''}>
+                  <p className="truncate text-base text-muted-foreground" title={m.status.error ?? ''}>
                     {explainError(m.status.error ?? 'Unknown error')}
                   </p>
                 )}
@@ -137,7 +144,7 @@ export function ProviderModels({ group, onChanged }: Props) {
                 />
               )}
 
-              <Button variant="ghost" size="sm" onClick={() => test(m)} disabled={testing !== null}>
+              <Button variant="ghost" size="sm" onClick={() => test(m)} disabled={testing !== null || !configured}>
                 {testing === m.id ? 'Testing…' : 'Test'}
               </Button>
             </div>

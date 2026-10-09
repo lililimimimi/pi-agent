@@ -88,14 +88,14 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
   // ── Connection status badge ──────────────────────────────────────────────
   const statusBadge = () => {
     if (testStatus === 'testing')
-      return <span className="flex items-center gap-1 text-sm text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Testing…</span>
+      return <span className="flex items-center gap-1 text-base text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Testing…</span>
     if (testStatus === 'ok' || provider.connected)
-      return <span className="flex items-center gap-1 text-sm text-emerald-600"><CheckCircle className="h-3 w-3" /> Connected</span>
+      return <span className="flex items-center gap-1 text-base text-emerald-600"><CheckCircle className="h-3 w-3" /> Connected</span>
     if (testStatus === 'error')
-      return <span className="flex items-center gap-1 text-sm text-destructive"><XCircle className="h-3 w-3" /> Failed</span>
+      return <span className="flex items-center gap-1 text-base text-destructive"><XCircle className="h-3 w-3" /> Failed</span>
     if (!provider.configured)
-      return <span className="flex items-center gap-1 text-sm text-muted-foreground"><XCircle className="h-3 w-3" /> Not configured</span>
-    return <span className="flex items-center gap-1 text-sm text-muted-foreground">○ Untested</span>
+      return <span className="flex items-center gap-1 text-base text-muted-foreground"><XCircle className="h-3 w-3" /> Not configured</span>
+    return <span className="flex items-center gap-1 text-base text-muted-foreground">○ Untested</span>
   }
 
   const fieldLabel = provider.key_field === 'api_key' ? 'API Key' : provider.key_field === 'base_url' ? 'Base URL' : ''
@@ -105,11 +105,11 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
     : ''
 
   return (
-    <div className="rounded-xl border border-border/30 bg-foreground/[0.015] px-3.5 py-3 space-y-2.5">
+    <div className="rounded-xl border border-border/50 bg-muted px-4 py-3.5 space-y-3">
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">{provider.label}</span>
+          <span className="text-base font-semibold">{provider.label}</span>
           {statusBadge()}
         </div>
 
@@ -119,16 +119,16 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
             onClick={handleTest}
             disabled={testStatus === 'testing' || !provider.configured}
             title={provider.configured ? 'Test connection' : 'Configure key first'}
-            className="flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground px-2 py-1 rounded-lg hover:bg-accent transition-colors disabled:opacity-30"
+            className={`flex items-center gap-1 text-base font-medium px-2 py-1 rounded-lg hover:bg-accent transition-colors disabled:opacity-30 ${testStatus === 'ok' || provider.connected ? 'text-emerald-600' : 'text-foreground/70 hover:text-foreground'}`}
           >
-            <Zap className="h-3 w-3" />
+            <Zap className={`h-3 w-3 ${testStatus === 'ok' || provider.connected ? 'fill-current text-emerald-600' : ''}`} />
             Test
           </button>
 
           {provider.custom && (
             <button
               onClick={() => { void deleteCustomProvider(provider.id).then(onUpdate) }}
-              className="text-sm text-foreground/70 hover:text-destructive px-2 py-1 rounded-lg hover:bg-accent transition-colors"
+              className="text-base font-medium text-foreground/70 hover:text-destructive px-2 py-1 rounded-lg hover:bg-accent transition-colors"
             >
               Remove
             </button>
@@ -141,14 +141,14 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
         <OAuthLogin providerId={provider.id} label={LOGIN_LABELS[provider.id]} onDone={onUpdate} />
       )}
       {LOGIN_LABELS[provider.id] && provider.configured && (
-        <Button variant="outline" size="sm" onClick={() => { void logoutProvider(provider.id).then(onUpdate) }}>
+        <Button variant="outline" size="sm" className="font-medium" onClick={() => { void logoutProvider(provider.id).then(onUpdate) }}>
           Log out
         </Button>
       )}
 
       {/* Readonly (pi OAuth) — just show a note */}
       {provider.readonly && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           {provider.note || 'Auto-detected from Pi CLI login.'}
         </p>
       )}
@@ -156,7 +156,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
       {/* Key / URL row — only for manually-configured providers */}
       {!provider.readonly && <div className="space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground w-14 shrink-0">{fieldLabel}</span>
+          <span className="text-base text-muted-foreground w-14 shrink-0">{fieldLabel}</span>
           {editing ? (
             <div className="flex-1 relative">
               <input
@@ -169,7 +169,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
                   if (e.key === 'Escape') { setEditing(false); setKeyValue(''); setSaveError('') }
                 }}
                 placeholder={provider.placeholder}
-                className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 pr-7 text-sm font-mono focus:outline-none focus:border-foreground/30 transition-colors placeholder:text-muted-foreground"
+                className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 pr-7 text-base font-mono focus:outline-none focus:border-foreground/30 transition-colors placeholder:text-muted-foreground"
               />
               <button
                 type="button"
@@ -180,7 +180,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
               </button>
             </div>
           ) : (
-            <span className="flex-1 text-sm font-mono text-muted-foreground truncate">
+            <span className="flex-1 text-base font-mono text-muted-foreground truncate">
               {currentValue || <span className="text-muted-foreground italic">not set</span>}
             </span>
           )}
@@ -188,7 +188,7 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
           {!editing && (
             <button
               onClick={() => setEditing(true)}
-              className="text-sm text-foreground/70 hover:text-foreground px-2 py-0.5 rounded hover:bg-accent transition-colors shrink-0"
+              className="text-base font-medium text-foreground/70 hover:text-foreground px-2 py-0.5 rounded hover:bg-accent transition-colors shrink-0"
             >
               {provider.configured ? 'Update' : 'Set'}
             </button>
@@ -200,36 +200,36 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
             <button
               onClick={handleSave}
               disabled={saving || !keyValue.trim()}
-              className="text-sm bg-foreground text-background rounded-md px-2.5 py-1 font-medium disabled:opacity-40"
+              className="text-base bg-foreground text-background rounded-md px-2.5 py-1 font-medium disabled:opacity-40"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
             <button
               onClick={() => { setEditing(false); setKeyValue(''); setSaveError('') }}
-              className="text-sm text-muted-foreground hover:text-foreground"
+              className="text-base font-medium text-muted-foreground hover:text-foreground"
             >
               Cancel
             </button>
-            {saveError && <span className="text-sm text-destructive">{saveError}</span>}
+            {saveError && <span className="text-base text-destructive">{saveError}</span>}
           </div>
         )}
       </div>}
 
       {/* Test error */}
       {testStatus === 'error' && testResult?.error && (
-        <p className="text-sm text-destructive/80 pl-0">{testResult.error}</p>
+        <p className="text-base text-destructive/80 pl-0">{testResult.error}</p>
       )}
 
       {/* Latency */}
       {testStatus === 'ok' && testResult && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           {testResult.latency_ms} ms
         </p>
       )}
 
       {/* Configured, but the provider returned no models */}
       {provider.configured && !catalog && !LOGIN_LABELS[provider.id] && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           This provider did not return a model list. Check its documentation for model names.
         </p>
       )}
@@ -237,7 +237,12 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
       {/* Models: enable the ones you want, then test them */}
       {catalog && (
         <div className="pt-1">
-          <ProviderModels group={catalog} onChanged={onUpdate} />
+          <ProviderModels
+            group={catalog}
+            configured={provider.configured}
+            unconfiguredHint={LOGIN_LABELS[provider.id] ? 'Log in to enable these models.' : 'Set an API key to enable these models.'}
+            onChanged={onUpdate}
+          />
         </div>
       )}
     </div>

@@ -29,14 +29,14 @@ function openList() {
 
 describe('ProviderModels', () => {
   it('is collapsed by default and shows how many models are enabled', () => {
-    render(<ProviderModels group={GROUP} onChanged={vi.fn()} />)
+    render(<ProviderModels group={GROUP} configured unconfiguredHint="" onChanged={vi.fn()} />)
     expect(screen.getByText('1 of 2 enabled')).toBeTruthy()
     expect(screen.queryByRole('switch')).toBeNull()
   })
 
   it('turning a model on saves the full enabled list for that provider', async () => {
     const onChanged = vi.fn()
-    render(<ProviderModels group={GROUP} onChanged={onChanged} />)
+    render(<ProviderModels group={GROUP} configured unconfiguredHint="" onChanged={onChanged} />)
     openList()
 
     fireEvent.click(screen.getByRole('switch', { name: 'Enable DeepSeek V4 Pro' }))
@@ -46,7 +46,7 @@ describe('ProviderModels', () => {
   })
 
   it('turning a model off removes it from the list', async () => {
-    render(<ProviderModels group={GROUP} onChanged={vi.fn()} />)
+    render(<ProviderModels group={GROUP} configured unconfiguredHint="" onChanged={vi.fn()} />)
     openList()
 
     fireEvent.click(screen.getByRole('switch', { name: 'Enable DeepSeek V4 Flash' }))
@@ -55,7 +55,7 @@ describe('ProviderModels', () => {
   })
 
   it('search filters the list', () => {
-    render(<ProviderModels group={GROUP} onChanged={vi.fn()} />)
+    render(<ProviderModels group={GROUP} configured unconfiguredHint="" onChanged={vi.fn()} />)
     openList()
 
     fireEvent.change(screen.getByPlaceholderText('Search models'), { target: { value: 'pro' } })
@@ -66,7 +66,7 @@ describe('ProviderModels', () => {
 
   it('Test checks that one model and refreshes the status', async () => {
     const onChanged = vi.fn()
-    render(<ProviderModels group={GROUP} onChanged={onChanged} />)
+    render(<ProviderModels group={GROUP} configured unconfiguredHint="" onChanged={onChanged} />)
     openList()
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Test' })[1])
@@ -75,8 +75,15 @@ describe('ProviderModels', () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled())
   })
 
+  it('cannot be opened, and shows the hint, when the provider has no key', () => {
+    render(<ProviderModels group={GROUP} configured={false} unconfiguredHint="Set an API key to enable these models." onChanged={vi.fn()} />)
+    expect(screen.getByText('Set an API key to enable these models.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /of 2 enabled/ }))
+    expect(screen.queryByRole('switch')).toBeNull()
+  })
+
   it('says so when a provider has no models', () => {
-    render(<ProviderModels group={{ ...GROUP, models: [] }} onChanged={vi.fn()} />)
+    render(<ProviderModels group={{ ...GROUP, models: [] }} configured unconfiguredHint="" onChanged={vi.fn()} />)
     expect(screen.getByText('No models found.')).toBeTruthy()
   })
 })

@@ -42,7 +42,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
       <div className="bg-card rounded-2xl shadow-2xl border border-border/50 w-[min(960px,calc(100vw-48px))] h-[min(720px,calc(100vh-64px))] flex flex-col overflow-hidden">
         {/* Title bar */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/40">
-          <h2 className="text-sm font-semibold tracking-tight">Settings</h2>
+          <h2 className="text-base font-semibold tracking-tight">Settings</h2>
           <button
             onClick={onClose}
             className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -59,7 +59,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               <button
                 key={id}
                 onClick={() => setTab(id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-base font-medium transition-colors ${
                   tab === id
                     ? 'bg-accent text-foreground'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
@@ -108,7 +108,7 @@ function ProvidersPage() {
     <div>
       <h3 className="text-sm font-semibold mb-1">Providers</h3>
       <p className="text-sm text-muted-foreground mb-4">
-        Add API keys, then turn on the models you want in the model picker. Keys are stored locally.
+        Configure API credentials for each provider, then enable the models to display in the model picker. Credentials are stored locally on this device.
       </p>
 
       {loading ? (
