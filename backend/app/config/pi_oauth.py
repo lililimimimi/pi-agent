@@ -34,24 +34,23 @@ def _read_raw() -> dict[str, Any]:
         return {}
 
 
+def _has_login(data: dict[str, Any]) -> bool:
+    """A login is usable while it has an access token, or a refresh token that can renew it.
+
+    The access token expires after about a day; Pi renews it with the refresh token
+    when it is used, so an expired access token alone does not mean the user logged out.
+    """
+    return bool(data.get("access") or data.get("refresh"))
+
+
 def is_logged_in(provider: str) -> bool:
-    """True if Pi has a non-expired OAuth login for this provider in auth.json."""
-    data = _read_raw().get(provider, {})
-    if not data.get("access"):
-        return False
-    expires_ms = data.get("expires", 0)
-    return not (expires_ms and time.time() * 1000 > expires_ms)
+    """True if Pi has a login for this provider in auth.json (expired access is renewed by Pi)."""
+    return _has_login(_read_raw().get(provider, {}))
 
 
 def is_available() -> bool:
-    """Return True if a valid (non-expired) Anthropic OAuth token exists."""
-    data = _read_raw().get("anthropic", {})
-    if not data.get("access"):
-        return False
-    expires_ms = data.get("expires", 0)
-    if expires_ms and time.time() * 1000 > expires_ms:
-        return False
-    return True
+    """True if Pi has a Claude.ai (Anthropic) login."""
+    return _has_login(_read_raw().get("anthropic", {}))
 
 
 def get_access_token() -> str | None:

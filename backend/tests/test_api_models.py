@@ -45,6 +45,7 @@ async def test_picker_lists_only_enabled_models(client, cfg_file):
 
     assert [m["id"] for m in r.json()] == ["deepseek-v4-flash-vision-exp"]
     assert r.json()[0]["supports_images"] is True
+    assert r.json()[0]["provider_label"] == "DeepSeek"
 
 
 async def test_catalog_shows_every_model_with_its_enabled_flag(client, cfg_file):

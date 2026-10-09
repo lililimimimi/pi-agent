@@ -74,6 +74,7 @@ async def enabled_models() -> list[dict[str, Any]]:
                     "id": m["id"],
                     "name": m["name"],
                     "provider": group["provider"],
+                    "provider_label": group["label"],
                     "supports_tools": True,
                     "supports_images": m["supports_images"],
                     "status": m["status"],
