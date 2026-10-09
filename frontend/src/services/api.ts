@@ -103,6 +103,7 @@ export async function fetchModels(): Promise<
     provider: string
     supports_tools: boolean
     supports_images: boolean
+    provider_label?: string
     status: ModelTestStatus | null
   }[]
 > {

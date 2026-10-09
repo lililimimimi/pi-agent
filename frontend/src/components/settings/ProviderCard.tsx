@@ -227,6 +227,13 @@ export function ProviderCard({ provider, catalog, onUpdate }: Props) {
         </p>
       )}
 
+      {/* Configured, but the provider returned no models */}
+      {provider.configured && !catalog && !LOGIN_LABELS[provider.id] && (
+        <p className="text-sm text-muted-foreground">
+          This provider did not return a model list. Check its documentation for model names.
+        </p>
+      )}
+
       {/* Models: enable the ones you want, then test them */}
       {catalog && (
         <div className="pt-1">

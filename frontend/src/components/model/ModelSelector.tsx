@@ -10,6 +10,7 @@ type ModelInfo = {
   name: string
   provider: string
   supports_images?: boolean
+  provider_label?: string
   status?: ModelTestStatus | null
 }
 
@@ -83,7 +84,8 @@ export function ModelSelector() {
   const current = models.find((m) => m.provider === provider && m.id === model)
   const rawLabel = current ? current.name : model
   const modelLabel = rawLabel.includes('/') ? rawLabel.split('/').pop()! : rawLabel
-  const providerLabel = PROVIDER_DISPLAY[provider] ?? provider
+  // Show the provider's name, never its internal id (e.g. custom-qwen-...)
+  const providerLabel = current?.provider_label ?? PROVIDER_DISPLAY[provider] ?? 'Provider'
 
   // Nothing enabled yet: the button itself opens Settings, no popup
   if (models.length === 0) {
@@ -117,7 +119,7 @@ export function ModelSelector() {
           {Object.entries(groupByProvider(models)).map(([providerName, providerModels]) => (
             <div key={providerName}>
               <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {PROVIDER_DISPLAY[providerName] ?? providerName}
+                {providerModels[0]?.provider_label ?? PROVIDER_DISPLAY[providerName] ?? 'Provider'}
               </div>
               {providerModels.map((m) => {
                 const isActive = m.provider === provider && m.id === model
