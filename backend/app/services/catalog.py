@@ -1,6 +1,7 @@
 """Model catalog: every known model, which ones the user enabled, and their last test."""
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -67,7 +68,11 @@ async def build_catalog() -> list[dict[str, Any]]:
 async def enabled_models() -> list[dict[str, Any]]:
     """Enabled models only, flattened for the top-right picker."""
     out: list[dict[str, Any]] = []
+    cfg = load_config()
     for group in await build_catalog():
+        # A provider without its own key or login can't run its models, so none are offered
+        if not _configured(cfg["providers"].get(group["provider"], {}), group["provider"]):
+            continue
         for m in group["models"]:
             if m["enabled"]:
                 out.append({
@@ -89,6 +94,34 @@ def save_enabled_models(provider: str, models: list[str]) -> list[str]:
     return unique
 
 
+# Errors that will keep happening until the user fixes the account or key.
+# Timeouts, network drops and rate limits clear up on their own, so they don't count.
+_LASTING_FAILURE = re.compile(
+    r"out of extra usage|quota|usage limit|insufficient|balance|billing|credit"
+    r"|not available|not supported|does not exist|model not found"
+    r"|401|403|invalid.*key|unauthori[sz]ed|authentication|api key|permission",
+    re.IGNORECASE,
+)
+
+
+def is_lasting_failure(message: str) -> bool:
+    return bool(_LASTING_FAILURE.search(message))
+
+
+def record_model_status(provider: str, model: str, ok: bool, error: str | None = None, ms: int | None = None) -> None:
+    """Save the last result for one model; the picker's dot shows it."""
+    if not known_provider(provider):
+        return
+    statuses = dict(load_config()["providers"].get(provider, {}).get("model_status") or {})
+    statuses[model] = {
+        "ok": ok,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "error": error,
+        "ms": ms,
+    }
+    update_provider_config(provider, {"model_status": statuses})
+
+
 async def run_model_test(body: dict[str, Any]) -> dict[str, Any]:
     """Send one short prompt through the bridge, then save the result on that model."""
     try:
@@ -98,13 +131,6 @@ async def run_model_test(body: dict[str, Any]) -> dict[str, Any]:
 
     provider = body.get("provider")
     model = body.get("model")
-    if isinstance(provider, str) and known_provider(provider) and isinstance(model, str):
-        statuses = dict(load_config()["providers"].get(provider, {}).get("model_status") or {})
-        statuses[model] = {
-            "ok": bool(result.get("ok")),
-            "checked_at": datetime.now(timezone.utc).isoformat(),
-            "error": result.get("error"),
-            "ms": result.get("ms"),
-        }
-        update_provider_config(provider, {"model_status": statuses})
+    if isinstance(provider, str) and isinstance(model, str):
+        record_model_status(provider, model, bool(result.get("ok")), result.get("error"), result.get("ms"))
     return result

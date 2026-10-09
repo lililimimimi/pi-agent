@@ -30,6 +30,7 @@ from app.types import (
 from app.sessions import store as session_store
 from app.sessions.models import MessageRecord
 from app.rules.engine import RulesEngine
+from app.services.catalog import is_lasting_failure, record_model_status
 from app.logging import get_logger, get_correlation_id, new_correlation_id, set_correlation_id
 
 log = get_logger(__name__)
@@ -245,6 +246,13 @@ async def stream_chat(session_id: str) -> StreamingResponse:
             _time.monotonic() - started,
             len("".join(assistant_text_parts)),
         )
+        # The model picker's dot follows the last real chat turn, not only the Settings test.
+        # A temporary failure (timeout, network) leaves the dot as it was.
+        if session.provider and session.model:
+            if error_messages and is_lasting_failure(error_messages[-1]):
+                record_model_status(session.provider, session.model, False, error_messages[-1])
+            elif assistant_text_parts and not error_messages:
+                record_model_status(session.provider, session.model, True)
         if session.persist_id and assistant_text_parts:
             full_text = "".join(assistant_text_parts)
             try:

@@ -126,7 +126,9 @@ export function ModelSelector() {
                 const dotColor = m.status?.ok ? 'bg-green-500' : m.status ? 'bg-red-500' : 'bg-foreground/20'
                 const dotTitle = m.status?.ok
                   ? `Works (${m.status.ms ?? '?'} ms)`
-                  : m.status ? 'Last test failed' : 'Not tested'
+                  : m.status
+                    ? (/out of extra usage|quota|usage limit|rate limit|429|insufficient/i.test(m.status.error ?? '') ? 'Out of quota' : 'Last test failed')
+                    : 'Not tested'
                 return (
                   <button
                     key={`${m.provider}-${m.id}`}

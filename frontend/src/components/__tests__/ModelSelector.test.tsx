@@ -45,7 +45,7 @@ describe('ModelSelector', () => {
     await openPicker()
 
     expect(await screen.findByTitle(/Works/)).toBeTruthy()
-    expect(screen.getByTitle('Last test failed')).toBeTruthy()
+    expect(screen.getByTitle('Out of quota')).toBeTruthy()
   })
 
   it('has no test buttons; testing happens in Settings', async () => {

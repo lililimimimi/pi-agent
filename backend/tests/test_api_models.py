@@ -34,8 +34,20 @@ BRIDGE_MODELS = [
 
 def _set_enabled(cfg_file: Path, provider: str, models: list[str]) -> None:
     cfg = json.loads(cfg_file.read_text()) if cfg_file.exists() else {"providers": {}}
-    cfg.setdefault("providers", {}).setdefault(provider, {})["enabled_models"] = models
+    entry = cfg.setdefault("providers", {}).setdefault(provider, {})
+    entry["enabled_models"] = models
+    # A provider only offers its models once it has a key (or login), as in real use
+    entry.setdefault("api_key", "sk-test")
     cfg_file.write_text(json.dumps(cfg))
+
+
+async def test_picker_hides_models_of_a_provider_without_a_key(client, cfg_file):
+    # DeepSeek has a model enabled but no API key: it must not show in the picker
+    cfg_file.write_text(json.dumps({"providers": {"deepseek": {"enabled_models": ["deepseek-v4-flash-vision-exp"]}}}))
+    with patch("app.services.catalog.bridge_models", AsyncMock(return_value=BRIDGE_MODELS)):
+        r = await client.get("/api/models")
+
+    assert r.json() == []
 
 
 async def test_picker_lists_only_enabled_models(client, cfg_file):
