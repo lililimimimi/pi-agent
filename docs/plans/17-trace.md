@@ -44,12 +44,12 @@ def get_logger(name: str) -> Logger:
 - [x] 在 `main.py` 调用 `setup_logging(level="DEBUG")`（可用 `LOG_LEVEL` 覆盖）
 - [x] 注入 `get_logger()`：chat API 和 bridge 已接入（agent/tools 的注入点随 Python Agent 精简一并移除，见 PROGRESS.md）
 - [x] `pytest tests/test_logging.py -v` → 通过（6 个）
-- [ ] 启动后发一条消息，观察日志输出格式（待你在本地确认）
+- [x] 启动后发一条消息，观察日志输出格式（已确认）
 
 ## ⏸ 审核后继续
 
 ## 验收标准
 - [x] 安装依赖并通过所有测试：`pip install -e ".[dev]" && python -m pytest tests/ -v`
 - [x] 无警告，无跳过（0 failed, 0 skipped）
-- [ ] 我审核代码通过
-- [ ] 我确认后才 commit
+- [x] 我审核代码通过
+- [x] 我确认后才 commit
