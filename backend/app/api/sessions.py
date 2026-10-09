@@ -75,6 +75,23 @@ async def bulk_delete_sessions(req: BulkDeleteRequest):
 _SAFE_ID = re.compile(r"^[A-Za-z0-9_.\-]+$")
 
 
+class RenameSessionRequest(BaseModel):
+    title: str
+
+
+@router.post("/{session_id}/title")
+async def rename_session(session_id: str, req: RenameSessionRequest) -> dict[str, str]:
+    """Save a new title for a session in its file, so it survives a reload."""
+    title = req.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
+    try:
+        store.update_title(session_id, title)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return {"status": "ok"}
+
+
 @router.post("/{session_id}/reveal")
 async def reveal_session_file(session_id: str) -> dict[str, str]:
     """Select the session file in Finder (macOS). Used by the sidebar menu."""
