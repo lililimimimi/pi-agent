@@ -154,7 +154,10 @@ async def create_chat(req: ChatRequest) -> dict[str, str]:
         meta = session_store.create_session(title=title, project_id=req.project_path)
         persist_id = meta.id
 
-    for m in messages:
+    # A new session stores the whole history. An existing session already has its earlier
+    # turns saved, so only the new user message is added (otherwise history repeats).
+    to_store = messages if not req.persist_id else [m for m in messages[-1:] if m.role == Role.USER]
+    for m in to_store:
         # Session files store text only; images are noted but not written out
         record_text = text_of(m.content)
         n_images = len(images_of(m.content))
@@ -198,6 +201,7 @@ async def stream_chat(session_id: str) -> StreamingResponse:
         set_correlation_id(session.cid)
         started = _time.monotonic()
         assistant_text_parts: list[str] = []
+        error_messages: list[str] = []
         log.info("stream started: provider={} model={}", session.provider, session.model)
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream(
@@ -231,6 +235,8 @@ async def stream_chat(session_id: str) -> StreamingResponse:
                             evt = _json.loads(line[6:])
                             if evt.get("event") == "text":
                                 assistant_text_parts.append(evt["data"]["content"])
+                            elif evt.get("event") == "error":
+                                error_messages.append(str(evt["data"].get("message", "")))
                         except (ValueError, KeyError):
                             pass
 
@@ -245,6 +251,15 @@ async def stream_chat(session_id: str) -> StreamingResponse:
                 session_store.append_record(
                     session.persist_id,
                     MessageRecord(role="assistant", content=full_text),
+                )
+            except FileNotFoundError:
+                pass
+        elif session.persist_id and error_messages:
+            # Keep a failed turn visible after a reload
+            try:
+                session_store.append_record(
+                    session.persist_id,
+                    MessageRecord(role="assistant", content=f"Error: {error_messages[-1]}"),
                 )
             except FileNotFoundError:
                 pass

@@ -176,3 +176,43 @@ async def test_bridge_error_status_is_reported_to_the_browser(client: AsyncClien
     assert '"event": "error"' in r.text or '"event":"error"' in r.text
     assert "HTTP 413" in r.text
     assert '"event": "done"' in r.text or '"event":"done"' in r.text
+
+
+async def test_existing_session_does_not_repeat_its_history(client: AsyncClient):
+    """Each new turn adds only the new user message; earlier turns are already saved."""
+    first = await _create(client, [{"role": "user", "content": "one"}])
+    persist_id = first.json()["persist_id"]
+
+    second = await client.post("/api/chat", json={
+        "messages": [
+            {"role": "user", "content": "one"},
+            {"role": "assistant", "content": "reply"},
+            {"role": "user", "content": "two"},
+        ],
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-5",
+        "persist_id": persist_id,
+    })
+    assert second.status_code == 200
+
+    records = [r for r in session_store.get_session(persist_id) if r.get("type") == "message"]
+    assert [r["content"] for r in records] == ["one", "two"]
+
+
+async def test_failed_turn_is_saved_so_the_error_survives_a_reload(client: AsyncClient):
+    r = await _create(client, [{"role": "user", "content": "hello"}])
+    session_id, persist_id = r.json()["session_id"], r.json()["persist_id"]
+
+    class _ErrorLine:
+        status_code = 200
+
+        async def aiter_lines(self):
+            yield 'data: {"event": "error", "data": {"message": "out of extra usage"}}'
+
+    client_mock = _fake_bridge({})
+    client_mock.stream = MagicMock(side_effect=lambda *a, **k: _FakeStream(_ErrorLine()))
+    with patch("app.api.chat.httpx.AsyncClient", return_value=client_mock):
+        await client.get(f"/api/chat/stream/{session_id}")
+
+    records = [r for r in session_store.get_session(persist_id) if r.get("type") == "message"]
+    assert records[-1] == {"type": "message", "role": "assistant", "content": "Error: out of extra usage"}

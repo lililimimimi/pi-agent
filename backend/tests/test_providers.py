@@ -224,7 +224,7 @@ def test_test_provider_ollama_success(client: TestClient, monkeypatch):
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(return_value=mock_response)
 
-    with patch("app.api.providers.httpx.AsyncClient", return_value=mock_client):
+    with patch("app.services.discovery.httpx.AsyncClient", return_value=mock_client):
         resp = client.post("/api/providers/ollama/test")
 
     assert resp.status_code == 200
@@ -262,7 +262,7 @@ def test_test_provider_anthropic_with_key(client: TestClient, tmp_path: Path, mo
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(return_value=mock_response)
 
-    with patch("app.api.providers.httpx.AsyncClient", return_value=mock_client):
+    with patch("app.services.discovery.httpx.AsyncClient", return_value=mock_client):
         from app.main import app
         with TestClient(app) as c:
             resp = c.post("/api/providers/anthropic/test")
@@ -298,7 +298,7 @@ def test_test_provider_http_error(client: TestClient, tmp_path: Path, monkeypatc
     mock_resp2.raise_for_status = MagicMock(side_effect=http_error)
     mock_client.get = AsyncMock(return_value=mock_resp2)
 
-    with patch("app.api.providers.httpx.AsyncClient", return_value=mock_client):
+    with patch("app.services.discovery.httpx.AsyncClient", return_value=mock_client):
         from app.main import app
         with TestClient(app) as c:
             resp = c.post("/api/providers/deepseek/test")

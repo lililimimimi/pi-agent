@@ -40,7 +40,7 @@ def _set_enabled(cfg_file: Path, provider: str, models: list[str]) -> None:
 
 async def test_picker_lists_only_enabled_models(client, cfg_file):
     _set_enabled(cfg_file, "deepseek", ["deepseek-v4-flash-vision-exp"])
-    with patch("app.api.models._bridge_models", AsyncMock(return_value=BRIDGE_MODELS)):
+    with patch("app.services.catalog.bridge_models", AsyncMock(return_value=BRIDGE_MODELS)):
         r = await client.get("/api/models")
 
     assert [m["id"] for m in r.json()] == ["deepseek-v4-flash-vision-exp"]
@@ -49,7 +49,7 @@ async def test_picker_lists_only_enabled_models(client, cfg_file):
 
 async def test_catalog_shows_every_model_with_its_enabled_flag(client, cfg_file):
     _set_enabled(cfg_file, "deepseek", ["deepseek-v4-flash"])
-    with patch("app.api.models._bridge_models", AsyncMock(return_value=BRIDGE_MODELS)):
+    with patch("app.services.catalog.bridge_models", AsyncMock(return_value=BRIDGE_MODELS)):
         r = await client.get("/api/models/catalog")
 
     deepseek = next(g for g in r.json() if g["provider"] == "deepseek")
@@ -76,9 +76,9 @@ async def test_test_result_is_saved_on_the_model(client, cfg_file):
     fake = AsyncMock()
     fake.__aenter__ = AsyncMock(return_value=fake)
     fake.__aexit__ = AsyncMock(return_value=False)
-    fake.post = AsyncMock(return_value=bridge_reply)
+    fake.request = AsyncMock(return_value=bridge_reply)
 
-    with patch("app.api.models.httpx.AsyncClient", return_value=fake):
+    with patch("app.services.bridge.httpx.AsyncClient", return_value=fake):
         await client.post("/api/models/test", json={"provider": "deepseek", "model": "deepseek-v4-flash"})
 
     status = json.loads(cfg_file.read_text())["providers"]["deepseek"]["model_status"]["deepseek-v4-flash"]
@@ -88,7 +88,7 @@ async def test_test_result_is_saved_on_the_model(client, cfg_file):
 
 async def test_default_model_is_the_first_enabled_one(client, cfg_file):
     _set_enabled(cfg_file, "deepseek", ["deepseek-v4-flash"])
-    with patch("app.api.models._bridge_models", AsyncMock(return_value=BRIDGE_MODELS)):
+    with patch("app.services.catalog.bridge_models", AsyncMock(return_value=BRIDGE_MODELS)):
         r = await client.get("/api/models/default")
 
     assert r.json() == {"provider": "deepseek", "model": "deepseek-v4-flash"}
@@ -98,8 +98,8 @@ async def test_model_test_reports_unreachable_bridge_instead_of_failing(client, 
     broken = AsyncMock()
     broken.__aenter__ = AsyncMock(return_value=broken)
     broken.__aexit__ = AsyncMock(return_value=False)
-    broken.post = AsyncMock(side_effect=httpx.ConnectError("refused"))
-    with patch("app.api.models.httpx.AsyncClient", return_value=broken):
+    broken.request = AsyncMock(side_effect=httpx.ConnectError("refused"))
+    with patch("app.services.bridge.httpx.AsyncClient", return_value=broken):
         r = await client.post("/api/models/test", json={"provider": "deepseek", "model": "x"})
 
     assert r.status_code == 200
@@ -108,7 +108,7 @@ async def test_model_test_reports_unreachable_bridge_instead_of_failing(client, 
 
 
 async def test_custom_provider_is_added_listed_and_removed(client, cfg_file):
-    with patch("app.api.providers._test_connection", AsyncMock(return_value=(["my-model"], None))):
+    with patch("app.services.custom_providers.discover_models", AsyncMock(return_value=(["my-model"], None))):
         r = await client.post("/api/providers/custom", json={
             "name": "My Gateway", "base_url": "https://gw.example.com/v1/", "api_key": "sk-x",
         })

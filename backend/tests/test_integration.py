@@ -20,8 +20,8 @@ async def client():
 @pytest.mark.asyncio
 async def test_models_default_returns_mock_when_no_real_providers(client: AsyncClient):
     """When bridge is down and no config providers, returns built-in default."""
-    with patch("app.api.models.BRIDGE", "http://127.0.0.1:19999"), \
-         patch("app.api.models.list_models", AsyncMock(return_value=[])):
+    with patch("app.services.bridge.BRIDGE_URL", "http://127.0.0.1:19999"), \
+         patch("app.api.models.enabled_models", AsyncMock(return_value=[])):
         r = await client.get("/api/models/default")
     assert r.status_code == 200
     body = r.json()
@@ -33,7 +33,7 @@ async def test_models_default_returns_mock_when_no_real_providers(client: AsyncC
 async def test_models_default_prefers_first_enabled_model(client: AsyncClient):
     """The default is the first model the user enabled in Settings."""
     enabled = [{"id": "fake-v1", "name": "Fake V1", "provider": "fake-cloud", "supports_tools": True}]
-    with patch("app.api.models.list_models", AsyncMock(return_value=enabled)):
+    with patch("app.api.models.enabled_models", AsyncMock(return_value=enabled)):
         r = await client.get("/api/models/default")
     assert r.status_code == 200
     assert r.json() == {"provider": "fake-cloud", "model": "fake-v1"}
