@@ -36,7 +36,7 @@ function makePreviewExtension(ctrl: PreviewController) {
   return (pi: ExtensionAPI) => {
     pi.on("tool_call", async (event) => {
       if (!ctrl.enabled || ctrl.confirmed || ctrl.cancelled) return;
-      if (!isWriteTool(event.toolName)) return;
+      if (!isWriteTool(event.toolName, event.input as Record<string, unknown>)) return;
 
       const previewId = crypto.randomUUID();
       const steps = buildPreview({

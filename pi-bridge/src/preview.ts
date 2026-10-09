@@ -16,7 +16,28 @@ export const PREVIEW_TIMEOUT_MS = 60_000;
 /** Tools that never modify state — they bypass the preview gate. */
 export const READ_ONLY_TOOLS = new Set(["read", "grep", "find", "ls"]);
 
-export function isWriteTool(toolName: string): boolean {
+// Shell commands that only read. Anything else (or anything with redirects,
+// substitutions or unknown commands) counts as a write and asks for confirmation.
+const READ_ONLY_COMMANDS = new Set([
+  "ls", "cat", "pwd", "head", "tail", "wc", "echo", "which", "grep", "rg", "file", "stat", "du", "df", "date", "whoami",
+]);
+const READ_ONLY_GIT = new Set(["status", "log", "diff", "show", "branch", "remote", "rev-parse"]);
+
+function isReadOnlyShell(command: string): boolean {
+  if (/[>`]|\$\(/.test(command)) return false; // redirects and substitutions can write
+  const parts = command.split(/\s*(?:\|\||&&|;|\|)\s*/).filter(Boolean);
+  return parts.length > 0 && parts.every((part) => {
+    const [cmd, sub] = part.trim().split(/\s+/);
+    if (cmd === "git") return READ_ONLY_GIT.has(sub ?? "");
+    return READ_ONLY_COMMANDS.has(cmd);
+  });
+}
+
+export function isWriteTool(toolName: string, args: ToolArgs = {}): boolean {
+  if (toolName === "bash") {
+    const command = str(args.command);
+    return !(command && isReadOnlyShell(command));
+  }
   return !READ_ONLY_TOOLS.has(toolName);
 }
 

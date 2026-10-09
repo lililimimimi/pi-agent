@@ -15,8 +15,8 @@ describe("preview classification", () => {
     }
   });
 
-  it("treats edit/write/bash as write tools", () => {
-    for (const tool of ["edit", "write", "bash", "powershell"]) {
+  it("treats edit/write as write tools, and bash as write unless the command only reads", () => {
+    for (const tool of ["edit", "write", "powershell"]) {
       assert.equal(isWriteTool(tool), true, `${tool} should be a write tool`);
     }
   });
@@ -115,5 +115,17 @@ describe("PreviewRegistry", () => {
     registry.wait("pv-4", { timeoutMs: 1000 });
     registry.dispose();
     assert.equal(registry.has("pv-4"), false);
+  });
+
+  it("lets read-only shell commands run without confirmation", () => {
+    for (const command of ["ls -la", "pwd", "git status", "git log --oneline -5", "cat a.txt | wc -l"]) {
+      assert.equal(isWriteTool("bash", { command }), false, `${command} should be read-only`);
+    }
+  });
+
+  it("still asks for confirmation for writes, deletes and unknown commands", () => {
+    for (const command of ["rm -rf build", "npm test", "echo hi > out.txt", "git commit -m x", "ls && rm x"]) {
+      assert.equal(isWriteTool("bash", { command }), true, `${command} should need confirmation`);
+    }
   });
 });
