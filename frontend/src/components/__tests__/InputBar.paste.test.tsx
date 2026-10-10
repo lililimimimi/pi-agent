@@ -82,7 +82,7 @@ describe('pasting a screenshot into the input', () => {
   it('attaches an image dropped onto the input area', async () => {
     const { container } = renderInputBar()
     const file = screenshot()
-    const area = container.querySelector('.max-w-2xl') as HTMLElement
+    const area = container.querySelector('.max-w-3xl') as HTMLElement
 
     fireEvent.drop(area, { dataTransfer: { files: [file], items: [], types: ['Files'] } })
 

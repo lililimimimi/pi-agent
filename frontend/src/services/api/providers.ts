@@ -63,8 +63,6 @@ export async function fetchProviderModels(id: string): Promise<string[]> {
 
 // ── Legacy API Key aliases (kept for backward compat) ──────────────────
 
-export type ApiKeyStatus = { provider: string; configured: boolean }
-
 // ── Session Persistence ─────────────────────────────────────────────
 
 /** Adds an OpenAI-compatible provider; the backend fetches its model list. */

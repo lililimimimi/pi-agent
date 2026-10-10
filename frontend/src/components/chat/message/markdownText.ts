@@ -12,7 +12,7 @@ export function extractText(node: ReactNode): string {
   return ''
 }
 
-/** 从 <code className="language-xxx"> 提取语言名 */
+/** Read the language name from <code className="language-xxx"> */
 export function extractLang(node: ReactNode): string {
   if (!node || typeof node !== 'object' || !('props' in node)) return ''
   const cls = (node as React.ReactElement<{ className?: string }>).props.className ?? ''

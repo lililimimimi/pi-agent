@@ -1,3 +1,4 @@
+import type { SessionRecord } from '@/lib/schemas'
 /**
  * Converts messages between the chat screen and the API / saved session records.
  * Pure functions: no store state, so they are easy to test on their own.
@@ -19,17 +20,17 @@ export function toApiContent(m: Message, includeImages: boolean): string | Conte
 }
 
 /** Converts stored session records into chat messages (text only). */
-export function recordsToMessages(records: any[]): Message[] {
+export function recordsToMessages(records: SessionRecord[]): Message[] {
   let counter = 0
   return records
-    .filter((r: any) => r.type === 'message')
-    .map((r: any): Message => {
+    .filter((r) => r.type === 'message')
+    .map((r): Message => {
       const id = `restored-${++counter}`
-      const content: string = r.content || ''
+      const content = r.content || ''
       // A failed turn is saved as "Error: <text>"; show it as an error, not as a reply
       if (r.role === 'assistant' && content.startsWith('Error: ')) {
         return { id, role: 'assistant', content: '', error: content.slice('Error: '.length) }
       }
-      return { id, role: r.role as 'user' | 'assistant', content: stripImageMarker(content) }
+      return { id, role: r.role === 'user' ? 'user' : 'assistant', content: stripImageMarker(content) }
     })
 }

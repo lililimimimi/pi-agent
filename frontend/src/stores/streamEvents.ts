@@ -4,12 +4,11 @@
  */
 import type { ExecutionPreview } from '@/components/chat/ExecutionPreviewCard'
 import type { Message, SSEEventData, TokenUsage, ToolCall, ToolResult } from '@/types'
-import type { AgentStatus, PermissionRequest, SessionSnapshot } from '@/stores/chatStore'
+import type { AgentStatus, SessionSnapshot } from '@/stores/chatStore'
 
 /** The parts of the store a stream event can read */
 export type StreamState = {
   messages: Message[]
-  permissionRequests: Map<string, PermissionRequest>
   sessions: SessionSnapshot[]
   activeId: string
 }
@@ -17,7 +16,6 @@ export type StreamState = {
 /** The store fields one event can change */
 export type StreamPatch = Partial<{
   messages: Message[]
-  permissionRequests: Map<string, PermissionRequest>
   agentStatus: AgentStatus
   lastEventAt: number
   tokenUsage: TokenUsage
@@ -52,19 +50,6 @@ export function streamEventPatch(state: StreamState, event: SSEEventData): Strea
         agentStatus: 'tool_calling',
         lastEventAt: Date.now(),
       }
-    }
-
-    case 'permission_request': {
-      const pr: PermissionRequest = {
-        toolCallId: event.data.tool_call_id,
-        toolName: event.data.tool_name,
-        arguments: event.data.arguments,
-        status: 'pending',
-        createdAt: Date.now(),
-      }
-      const permissionRequests = new Map(state.permissionRequests)
-      permissionRequests.set(pr.toolCallId, pr)
-      return { permissionRequests, agentStatus: 'awaiting_approval', lastEventAt: Date.now() }
     }
 
     case 'tool_result': {

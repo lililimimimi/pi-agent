@@ -130,7 +130,18 @@ export const CreateChatResponseSchema = z
   .passthrough()
 
 /** Records of one saved session: the meta line, then messages (each has a `type`) */
-export const SessionRecordsSchema = z.array(z.object({ type: z.string() }).passthrough())
+/** One line of a saved session: the meta line, or a message (with role and content) */
+export const SessionRecordSchema = z
+  .object({
+    type: z.string(),
+    role: z.string().optional(),
+    content: z.string().optional(),
+  })
+  .passthrough()
+
+export const SessionRecordsSchema = z.array(SessionRecordSchema)
+
+export type SessionRecord = z.infer<typeof SessionRecordSchema>
 
 // One event of the chat stream. Unknown events are an error: the backend and the page ship together.
 export const SSEEventSchema = z.discriminatedUnion('event', [
@@ -154,16 +165,6 @@ export const SSEEventSchema = z.discriminatedUnion('event', [
     data: z.object({ input_tokens: z.number(), output_tokens: z.number() }).passthrough(),
   }),
   z.object({ event: z.literal('done'), data: z.object({}).passthrough() }),
-  z.object({
-    event: z.literal('permission_request'),
-    data: z
-      .object({
-        tool_call_id: z.string(),
-        tool_name: z.string(),
-        arguments: z.record(z.unknown()),
-      })
-      .passthrough(),
-  }),
   z.object({ event: z.literal('error'), data: z.object({ message: z.string() }).passthrough() }),
   z.object({
     event: z.literal('execution_preview'),

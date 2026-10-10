@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/services/api/chat', () => ({
   createChat: vi.fn(),
   streamChat: vi.fn(),
-  approveToolCall: vi.fn(),
 }))
 vi.mock('@/services/api/models', () => ({
   fetchDefaultModel: vi.fn(),

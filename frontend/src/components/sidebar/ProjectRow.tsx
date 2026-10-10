@@ -5,6 +5,7 @@ import { revealProjectFolder, renameProjectApi } from '@/services/api/projects'
 import { useToast } from '@/components/useToast'
 import { RenameInput } from '@/components/sidebar/RenameInput'
 import { DeleteProjectDialog } from '@/components/sidebar/DeleteProjectDialog'
+import { useMenuKeyboard } from '@/hooks/useFocusManagement'
 
 export function ProjectRow({
   project,
@@ -34,6 +35,8 @@ export function ProjectRow({
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  useMenuKeyboard(menuRef, menuOpen, () => setMenuOpen(false), triggerRef)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -71,6 +74,10 @@ export function ProjectRow({
 
         {!renaming && (
           <button
+            ref={triggerRef}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label="Project actions"
             className="shrink-0 opacity-0 group-hover/proj:opacity-100 w-5 h-5 flex items-center justify-center rounded-md hover:bg-foreground/10 transition-all"
             onClick={(e) => {
               e.stopPropagation()
@@ -84,9 +91,11 @@ export function ProjectRow({
         {menuOpen && (
           <div
             ref={menuRef}
+            role="menu"
             className="absolute right-2 top-8 z-50 min-w-[140px] rounded-xl border border-border/60 bg-card shadow-lg p-1 text-sm"
           >
             <button
+              role="menuitem"
               className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-accent transition-colors text-foreground/80"
               onClick={(e) => {
                 e.stopPropagation()
@@ -98,6 +107,7 @@ export function ProjectRow({
               Rename
             </button>
             <button
+              role="menuitem"
               className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-accent transition-colors text-foreground/80"
               onClick={(e) => {
                 e.stopPropagation()
@@ -112,6 +122,7 @@ export function ProjectRow({
             </button>
             {projects.length > 1 && (
               <button
+                role="menuitem"
                 className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-destructive/10 text-destructive transition-colors"
                 onClick={(e) => {
                   e.stopPropagation()

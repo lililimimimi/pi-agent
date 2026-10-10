@@ -77,15 +77,4 @@ describe('ToolCallCard', () => {
     await user.click(screen.getByText('Result'))
     expect(screen.getByText('file content here')).toBeInTheDocument()
   })
-
-  it('shows approve/reject buttons when running', () => {
-    render(<ToolCallCard toolCall={mockToolCall} />)
-    expect(screen.getByText('Approve')).toBeInTheDocument()
-    expect(screen.getByText('Reject')).toBeInTheDocument()
-  })
-
-  it('hides approve/reject buttons when done', () => {
-    render(<ToolCallCard toolCall={mockToolCall} result={mockResult} />)
-    expect(screen.queryByText('Approve')).not.toBeInTheDocument()
-  })
 })
