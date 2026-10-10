@@ -26,9 +26,15 @@ async def bridge_call(
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             r = await client.request(method, f"{BRIDGE_URL}{path}", json=body)
-            return r.json()
+            data = r.json()
     except (httpx.HTTPError, ValueError) as e:
         raise BridgeError(str(e)) from e
+    if r.status_code >= 400:
+        # The bridge answers errors as { error: { message } } or as a plain string
+        error = data.get("error") if isinstance(data, dict) else None
+        message = error.get("message") if isinstance(error, dict) else error
+        raise BridgeError(str(message or f"pi-bridge returned HTTP {r.status_code}"))
+    return data
 
 
 async def bridge_models() -> list[dict[str, Any]]:

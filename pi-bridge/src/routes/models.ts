@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { createAgentSession, SessionManager } from '@earendil-works/pi-coding-agent'
 import type { AgentSession } from '@earendil-works/pi-coding-agent'
 import { ensureRuntime, MODEL_ALIASES, PROVIDER_ALIAS } from '../runtime.js'
+import { log } from '../logger.js'
 
 const HOME_DIR = homedir()
 
@@ -21,7 +22,7 @@ router.get('/models', async (_req, res) => {
     }))
     res.json(models)
   } catch (err) {
-    console.error('[bridge] /models error:', err)
+    log.error('/models error:', err)
     res.json([])
   }
 })

@@ -70,26 +70,6 @@ export async function* streamChat(sessionId: string, signal?: AbortSignal): Asyn
   }
 }
 
-/**
- * Approve or reject a tool call.
- */
-export async function approveToolCall(
-  sessionId: string,
-  toolCallId: string,
-  approved: boolean,
-): Promise<void> {
-  const res = await fetch(`${API_BASE}/tool/approve`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      session_id: sessionId,
-      tool_call_id: toolCallId,
-      approved,
-    }),
-  })
-  if (!res.ok) throw await requestError(res, 'Failed to approve tool')
-}
-
 /** Ends a streaming reply early; the backend keeps the text written so far. */
 export async function stopChatApi(sessionId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/chat/stop/${encodeURIComponent(sessionId)}`, { method: 'POST' })

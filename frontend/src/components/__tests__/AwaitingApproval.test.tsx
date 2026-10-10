@@ -7,7 +7,7 @@ import { useChatStore } from '@/stores/chatStore'
 // The header says so when the agent is waiting on the user, and says nothing otherwise
 describe('header: awaiting approval', () => {
   beforeEach(() => {
-    useChatStore.setState({ agentStatus: 'idle', executionPreview: null, permissionRequests: new Map() })
+    useChatStore.setState({ executionPreview: null })
   })
 
   it('is hidden while nothing is waiting', () => {
@@ -17,16 +17,6 @@ describe('header: awaiting approval', () => {
       </ToastProvider>,
     )
     expect(screen.queryByText('Awaiting approval')).toBeNull()
-  })
-
-  it('shows while a tool call waits for approval', () => {
-    useChatStore.setState({ agentStatus: 'awaiting_approval' })
-    render(
-      <ToastProvider>
-        <App />
-      </ToastProvider>,
-    )
-    expect(screen.getByRole('status')).toHaveTextContent('Awaiting approval')
   })
 
   it('shows while an execution preview waits for an answer', () => {

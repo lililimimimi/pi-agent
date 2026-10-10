@@ -115,9 +115,12 @@ async def test_stop_pressed_twice_saves_once(client: AsyncClient):
     assert _assistant_texts(persist_id) == ["Partial "]
 
 
-async def test_stop_unknown_session_returns_404(client: AsyncClient):
+async def test_stop_after_the_reply_finished_is_ok_and_does_nothing(
+    client: AsyncClient,
+):
+    """The reply can finish just before Stop arrives: that is not an error, there is nothing to stop."""
     r = await client.post("/api/chat/stop/no-such-session")
-    assert r.status_code == 404
+    assert r.status_code == 200
 
 
 async def test_closed_tab_mid_reply_saves_partial_text(client: AsyncClient):

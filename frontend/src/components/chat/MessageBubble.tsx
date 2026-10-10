@@ -55,7 +55,7 @@ export const MessageBubble = memo(function MessageBubble({
           'rounded-2xl px-5 py-4',
           isUser
             ? 'max-w-[80%] bg-foreground text-background text-sm leading-relaxed'
-            : // assistant: 白底无框，撑满宽度
+            : // assistant: white, no border, full width
               'w-full bg-transparent',
         )}
       >

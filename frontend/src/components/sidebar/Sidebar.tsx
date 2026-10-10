@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useChatStore } from '@/stores/chatStore'
 import { AddProjectModal } from '@/components/sidebar/AddProjectModal'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { FileBrowser } from '@/components/files/FileBrowser'
 import { useFileBrowserStore } from '@/stores/fileBrowserStore'
 import { useLayoutStore, clampSidebarWidth } from '@/stores/layoutStore'
@@ -44,6 +45,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
   const activeId = useChatStore((s) => s.activeId)
   const newSession = useChatStore((s) => s.newSession)
   const bulkDeleteSessions = useChatStore((s) => s.bulkDeleteSessions)
+  const sessionsLoading = useChatStore((s) => s.sessionsLoading)
   const isStreaming = useChatStore((s) => s.isStreaming)
   const sidebarView = useFileBrowserStore((s) => s.view)
   const setSidebarView = useFileBrowserStore((s) => s.setView)
@@ -97,8 +99,10 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
     setSelected((prev) => (prev.size === allIds.length ? new Set() : new Set(allIds)))
   }
 
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false)
+
   const confirmBulkDelete = () => {
-    if (selected.size === 0) return
+    setBulkConfirmOpen(false)
     bulkDeleteSessions([...selected])
     setSelected(new Set())
     setEditMode(false)
@@ -240,8 +244,12 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
 
           {/* Session list */}
           <div className="space-y-px">
-            {projectSessions.length === 0 && (
-              <p className="px-3 py-2 text-sm text-muted-foreground italic">No sessions yet</p>
+            {sessionsLoading && (
+              <div className="space-y-2 px-3 py-2" aria-label="Loading chats" role="status">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-4 w-3/4 animate-pulse rounded-md bg-foreground/[0.07]" />
+                ))}
+              </div>
             )}
             {projectSessions.map((s) => (
               <SessionRow
@@ -259,7 +267,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
           {editMode && (
             <div className="mt-2 px-2">
               <button
-                onClick={confirmBulkDelete}
+                onClick={() => selected.size > 0 && setBulkConfirmOpen(true)}
                 disabled={selected.size === 0}
                 className="w-full py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed bg-destructive/10 text-destructive hover:bg-destructive/20 disabled:bg-transparent disabled:text-foreground/30"
               >
@@ -284,6 +292,20 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
       </div>
 
       <AddProjectModal open={addingProject} onClose={() => setAddingProject(false)} />
+
+      {bulkConfirmOpen && (
+        <ConfirmDialog
+          title={`Delete ${selected.size} chat{selected.size === 1 ? '' : 's'}?`}
+
+          description="The selected chats are removed from the list and their saved files are deleted. This cannot be undone."
+
+          confirmLabel="Delete"
+
+          onCancel={() => setBulkConfirmOpen(false)}
+
+          onConfirm={confirmBulkDelete}
+        />
+      )}
     </aside>
   )
 }

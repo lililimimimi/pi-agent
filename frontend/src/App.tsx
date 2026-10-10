@@ -7,7 +7,7 @@ import { ContextBar } from '@/components/chat/ContextBar'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { FilePreview } from '@/components/files/FilePreview'
 import { SettingsModal } from '@/components/settings/SettingsModal'
-import { ApprovalModal } from '@/components/chat/ApprovalModal'
+import { ShortcutsDialog } from '@/components/ShortcutsDialog'
 import { useToast } from '@/components/useToast'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
@@ -28,7 +28,7 @@ function WorkingDirectory() {
 // Shown in the header while the agent waits for the user: a tool approval or an execution preview.
 // Nothing times out, so this is how the user can tell the agent is waiting on them.
 function AwaitingApproval() {
-  const waiting = useChatStore((s) => s.agentStatus === 'awaiting_approval' || s.executionPreview !== null)
+  const waiting = useChatStore((s) => s.executionPreview !== null)
   if (!waiting) return null
   return (
     <span role="status" className="text-sm font-medium text-amber-600 whitespace-nowrap">
@@ -99,20 +99,6 @@ function useReplyDoneDot(): boolean {
   return done
 }
 
-function ActiveApprovalModal() {
-  const permissionRequests = useChatStore((s) => s.permissionRequests)
-  // Find the first pending request
-  let activeRequest = undefined
-  for (const req of permissionRequests.values()) {
-    if (req.status === 'pending') {
-      activeRequest = req
-      break
-    }
-  }
-  if (!activeRequest) return null
-  return <ApprovalModal request={activeRequest} />
-}
-
 const PI_GRADIENT = {
   background: 'linear-gradient(135deg, #007AFF 0%, #AF52DE 50%, #FF2D55 100%)',
   WebkitBackgroundClip: 'text',
@@ -129,9 +115,12 @@ export function App() {
   const newSession = useChatStore((s) => s.newSession)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   useReplyDoneDot()
 
   const isEmpty = messages.length === 0
+
+  const chatLoading = useChatStore((st) => st.chatLoading)
 
   // ── Toast + Network status ──
   const { showToast } = useToast()
@@ -150,6 +139,7 @@ export function App() {
     () => ({
       onNewChat: newSession,
       onOpenSettings: () => setSettingsOpen(true),
+      onShowShortcuts: () => setShortcutsOpen(true),
       onFocusInput: () => {
         const textarea = document.querySelector<HTMLTextAreaElement>('textarea[placeholder="Message pi…"]')
         textarea?.focus()
@@ -160,7 +150,7 @@ export function App() {
   useKeyboardShortcuts(shortcutHandlers)
 
   useEffect(() => {
-    // 先加载 projects（包含 path），再加载 sessions（需要 path 匹配），最后回到上次打开的位置
+    // Load projects first (they hold the path), then sessions (matched by path), then return to the last open view
     const init = async () => {
       await Promise.all([initProvider(), loadPersistedProjects()])
       await loadPersistedSessions()
@@ -212,7 +202,14 @@ export function App() {
           </header>
 
           {/* ── Empty state: greeting + input centered ── */}
-          {isEmpty ? (
+          {chatLoading ? (
+            <div
+              className="flex-1 flex items-center justify-center text-sm text-muted-foreground"
+              role="status"
+            >
+              Loading chat…
+            </div>
+          ) : isEmpty ? (
             <div className="flex-1 flex flex-col items-center justify-center px-6 pb-16">
               {/* Greeting */}
               <div className="text-center select-none mb-8">
@@ -235,7 +232,6 @@ export function App() {
             <>
               <ChatView />
               <InputBar />
-              <ActiveApprovalModal />
             </>
           )}
         </div>
@@ -244,6 +240,7 @@ export function App() {
       </div>
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
     </div>
   )
 }

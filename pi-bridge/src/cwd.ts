@@ -1,4 +1,5 @@
 import { statSync } from 'node:fs'
+import { log } from './logger.js'
 
 /**
  * Chooses the working directory for an agent session.
@@ -12,6 +13,6 @@ export function resolveSessionCwd(requested: unknown, fallback: string): string 
   } catch {
     // fall through to the fallback
   }
-  console.warn(`[bridge] project path is not a directory, using ${fallback}: ${requested}`)
+  log.warn(`project path is not a directory, using ${fallback}: ${requested}`)
   return fallback
 }

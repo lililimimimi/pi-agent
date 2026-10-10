@@ -1,4 +1,10 @@
-import { parseResponse, SessionListSchema, SessionRecordsSchema, type SessionSummary } from '@/lib/schemas'
+import {
+  parseResponse,
+  SessionListSchema,
+  SessionRecordsSchema,
+  type SessionRecord,
+  type SessionSummary,
+} from '@/lib/schemas'
 import { API_BASE } from '@/services/api/client'
 import { requestError } from '@/services/api/client'
 
@@ -8,7 +14,7 @@ export async function fetchSessions(): Promise<SessionSummary[]> {
   return parseResponse(SessionListSchema, await res.json(), 'GET /api/sessions')
 }
 
-export async function fetchSession(id: string): Promise<Record<string, unknown>[]> {
+export async function fetchSession(id: string): Promise<SessionRecord[]> {
   const res = await fetch(`${API_BASE}/sessions/${id}`)
   if (!res.ok) throw await requestError(res, 'Failed to fetch session')
   return parseResponse(SessionRecordsSchema, await res.json(), 'GET /api/sessions/:id')

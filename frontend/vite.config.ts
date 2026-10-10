@@ -13,6 +13,8 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    // Playwright's tests in e2e/ run with `npm run e2e`, not here
+    exclude: ['node_modules/**', 'e2e/**'],
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: true,

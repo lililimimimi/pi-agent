@@ -3,7 +3,9 @@ import { useChatStore } from '@/stores/chatStore'
 import { MessageSquare, MoreHorizontal, Pencil, Trash2, Check, FolderOpen as RevealIcon } from 'lucide-react'
 import { revealSessionFile } from '@/services/api/sessions'
 import { useToast } from '@/components/useToast'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { RenameInput } from '@/components/sidebar/RenameInput'
+import { useMenuKeyboard } from '@/hooks/useFocusManagement'
 
 export function SessionRow({
   session,
@@ -25,7 +27,10 @@ export function SessionRow({
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  useMenuKeyboard(menuRef, menuOpen, () => setMenuOpen(false), triggerRef)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -92,6 +97,10 @@ export function SessionRow({
 
       {!renaming && (
         <button
+          ref={triggerRef}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label="Chat actions"
           className="shrink-0 opacity-0 group-hover/row:opacity-100 w-5 h-5 flex items-center justify-center rounded-md hover:bg-foreground/10 transition-all"
           onClick={(e) => {
             e.stopPropagation()
@@ -105,9 +114,11 @@ export function SessionRow({
       {menuOpen && (
         <div
           ref={menuRef}
+          role="menu"
           className="absolute right-2 top-8 z-50 min-w-[140px] rounded-xl border border-border/60 bg-card shadow-lg p-1 text-sm"
         >
           <button
+            role="menuitem"
             className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-accent transition-colors text-foreground/80"
             onClick={(e) => {
               e.stopPropagation()
@@ -120,6 +131,7 @@ export function SessionRow({
           </button>
           {session.persistId && (
             <button
+              role="menuitem"
               className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-accent transition-colors text-foreground/80"
               onClick={(e) => {
                 e.stopPropagation()
@@ -138,13 +150,25 @@ export function SessionRow({
             onClick={(e) => {
               e.stopPropagation()
               setMenuOpen(false)
-              deleteSession(session.id)
+              setConfirmingDelete(true)
             }}
           >
             <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} />
             Delete
           </button>
         </div>
+      )}
+      {confirmingDelete && (
+        <ConfirmDialog
+          title={`Delete “${session.title || 'New chat'}”?`}
+          description="This chat is removed from the list and its saved file is deleted. This cannot be undone."
+          confirmLabel="Delete"
+          onCancel={() => setConfirmingDelete(false)}
+          onConfirm={() => {
+            setConfirmingDelete(false)
+            deleteSession(session.id)
+          }}
+        />
       )}
     </div>
   )

@@ -26,6 +26,7 @@ from app.config.meta import (
     PROVIDER_META,
     is_custom_provider,
 )
+from app.fileio import write_text_atomic
 
 
 def _config_path() -> Path:
@@ -68,9 +69,9 @@ def load_config() -> dict[str, Any]:
 
 
 def save_config(config: dict[str, Any]) -> None:
-    """Persist config to disk."""
+    """Persist config to disk. It holds API keys, so it is written owner-only and atomically."""
     _ensure_dir()
-    _config_path().write_text(json.dumps(config, indent=2))
+    write_text_atomic(_config_path(), json.dumps(config, indent=2))
 
 
 # ---------------------------------------------------------------------------

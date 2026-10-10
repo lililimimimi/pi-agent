@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 
 from app.errors import NotFoundError
@@ -18,6 +17,7 @@ log = get_logger(__name__)
 class ChatSession:
     def __init__(
         self,
+        session_id: str,
         messages: list[Message],
         provider: str,
         model: str,
@@ -28,6 +28,7 @@ class ChatSession:
         project_path: str = "",
         cid: str = "",
     ) -> None:
+        self.session_id = session_id
         self.messages = messages
         self.provider = provider
         self.model = model
@@ -38,8 +39,6 @@ class ChatSession:
         self.project_path = project_path
         # Same correlation ID as the create request, so the whole chat can be followed
         self.cid = cid or get_correlation_id()
-        self.approval_events: dict[str, asyncio.Event] = {}
-        self.approval_results: dict[str, bool] = {}
         # Reply text as it arrives, so a stopped reply can still be saved
         self.reply_parts: list[str] = []
         self.reply_saved = False
@@ -69,6 +68,16 @@ class ChatSession:
 
 
 _sessions: dict[str, ChatSession] = {}
+
+
+def forget_chat_session(session_id: str) -> None:
+    """Drop a finished chat from memory: its reply is saved, nothing else is needed for it."""
+    _sessions.pop(session_id, None)
+
+
+def find_chat_session(session_id: str) -> ChatSession | None:
+    """The live chat with this id, or None if it has finished and was forgotten."""
+    return _sessions.get(session_id)
 
 
 def get_chat_session(session_id: str) -> ChatSession:
@@ -132,6 +141,7 @@ def open_chat(
         rules = ""
 
     _sessions[session_id] = ChatSession(
+        session_id=session_id,
         messages=messages,
         provider=provider,
         model=model,

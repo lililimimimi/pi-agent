@@ -5,7 +5,7 @@
 - 模块 1–17 已完成并验收。
 - 模块 18（功能批次）已完成并提交，分 4 个提交：文档与环境、后端、bridge、前端。
 - 模块 18 之后的整理（格式、错误提示、接口与组件拆分、服务层、Zod 校验、测试命名）已完成，已包含在上述提交中。
-- 门禁：前端 198 个测试、后端 178 个、bridge 52 个、冒烟 1 个全部通过；tsc、lint、Prettier、ruff、`mypy --strict app` 全部通过。
+- 门禁：前端 193 个单元测试、后端 184 个、bridge 52 个全部通过，前端 Playwright 端到端 8 个通过（含滚动和停止）；tsc、lint、Prettier、ruff（含 C901 复杂度 10）、`mypy --strict app` 全部通过。
 
 ## 模块状态
 
@@ -71,6 +71,10 @@
 ## 当前问题
 
 - **README.md**：暂时为空，等项目全部完成后再编写。
+- **CI 还没在 GitHub 上跑过**：`.github/workflows/ci.yml` 已写好（后端、bridge、前端、端到端四个任务），但还没有推送验证。
+- **停止时保留已生成的文字未验证**：Playwright 已确认停止会调用接口、界面回到空闲；但已生成的部分文字是否保留，mock 无法模拟，仍需在真实后端上手动确认。
+- **长组件未拆分**：`AddProjectModal` 约 322 行，`Sidebar` 约 271 行，`ProviderCard` 约 263 行，`ProviderModels` 约 148 行。这几个近期没有改动，等下次修改时再拆。（`chatStore` 已拆为 `chatModel` / `sessionActions` / `projectActions` / `messageActions`，`InputBar` 已拆出 `ApprovalModeMenu` 和 `useImageAttachments`。）
+- **覆盖率报告未启用**：需要安装 `pytest-cov` 和 `@vitest/coverage-v8`，属于环境变动，等你确认。
 
 ## 下一步
 

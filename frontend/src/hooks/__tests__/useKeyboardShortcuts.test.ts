@@ -53,4 +53,11 @@ describe('useKeyboardShortcuts', () => {
     // Cleanup
     document.body.removeChild(textarea)
   })
+
+  it('Cmd+? opens the shortcut list', () => {
+    const onShowShortcuts = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onShowShortcuts }))
+    fireKey('?', { shiftKey: true })
+    expect(onShowShortcuts).toHaveBeenCalledTimes(1)
+  })
 })

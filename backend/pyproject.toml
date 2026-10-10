@@ -19,6 +19,8 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "httpx>=0.27.0",
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
 ]
 
 [tool.pytest.ini_options]
@@ -34,3 +36,8 @@ line-length = 88
 [tool.ruff.lint]
 # loguru formats messages with "{}"; pylint's logging rule reads them as stdlib logging and misfires
 ignore = ["PLE1205"]
+# C901: cyclomatic complexity, kept at 10 per function
+extend-select = ["C901"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10

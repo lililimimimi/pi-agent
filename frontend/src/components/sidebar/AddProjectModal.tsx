@@ -3,6 +3,7 @@ import { useChatStore } from '@/stores/chatStore'
 import { browseDirs, mkdirApi } from '@/services/api/projects'
 import { X, FolderOpen, Folder, ChevronRight, Home, Loader2, FolderPlus, Check } from 'lucide-react'
 import type { BrowseResult } from '@/services/api/projects'
+import { useDialogFocus } from '@/hooks/useFocusManagement'
 
 type Props = {
   open: boolean
@@ -82,6 +83,9 @@ export function AddProjectModal({ open, onClose }: Props) {
     }
   }, [creatingFolder])
 
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(dialogRef, open)
+
   if (!open) return null
 
   const handleSelect = () => {
@@ -129,6 +133,10 @@ export function AddProjectModal({ open, onClose }: Props) {
 
   return (
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="open-project-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
       onClick={onClose}
     >
@@ -141,7 +149,9 @@ export function AddProjectModal({ open, onClose }: Props) {
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-2">
             <FolderOpen className="h-5 w-5 text-foreground/60" strokeWidth={1.8} />
-            <h2 className="text-lg font-semibold">Open Project</h2>
+            <h2 id="open-project-title" className="text-lg font-semibold">
+              Open Project
+            </h2>
           </div>
           <div className="flex items-center gap-1">
             {/* New Folder button */}

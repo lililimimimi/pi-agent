@@ -10,7 +10,7 @@ const session = {
 } as never
 
 function stateWith(messages: StreamState['messages']): StreamState {
-  return { messages, permissionRequests: new Map(), sessions: [session], activeId: 's1' }
+  return { messages, sessions: [session], activeId: 's1' }
 }
 
 const reply = (content = '') => ({ id: 'a1', role: 'assistant' as const, content })
@@ -43,16 +43,6 @@ describe('streamEventPatch', () => {
     } as SSEEventData
     const patch = streamEventPatch(stateWith([reply()]), event)
     expect(patch.messages?.[0].toolResults).toEqual([{ toolCallId: 't1', output: 'ok', isError: false }])
-  })
-
-  it('stores a permission request as pending and waits for approval', () => {
-    const event = {
-      event: 'permission_request',
-      data: { tool_call_id: 'p1', tool_name: 'edit', arguments: {} },
-    } as SSEEventData
-    const patch = streamEventPatch(stateWith([reply()]), event)
-    expect(patch.permissionRequests?.get('p1')?.status).toBe('pending')
-    expect(patch.agentStatus).toBe('awaiting_approval')
   })
 
   it('updates token usage on the store and on the active session', () => {

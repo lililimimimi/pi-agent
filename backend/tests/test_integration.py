@@ -122,29 +122,3 @@ async def test_tool_execution_flow_emits_call_then_result(client: AsyncClient):
     tool_result_events = [e for e in events if e["event"] == "tool_result"]
     assert len(tool_result_events) == 1
     assert tool_result_events[0]["data"]["is_error"] is False
-
-
-async def test_permission_request_proxied(client: AsyncClient):
-    """Bridge permission_request event is correctly proxied."""
-    r = await client.post(
-        "/api/chat",
-        json={
-            "messages": [{"role": "user", "content": "write file"}],
-            "provider": "anthropic",
-            "model": "claude-sonnet-4-5",
-        },
-    )
-    session_id = r.json()["session_id"]
-
-    fake_lines = [
-        'data: {"event": "permission_request", "data": {"tool_call_id": "tc-1", "tool_name": "write_file", "arguments": {"path": "test.txt", "content": "hello"}}}',
-        'data: {"event": "done", "data": {}}',
-    ]
-    mock_client = _make_mock_bridge(fake_lines)
-
-    with patch("app.services.chat_stream.httpx.AsyncClient", return_value=mock_client):
-        stream_r = await client.get(f"/api/chat/stream/{session_id}")
-
-    events = _parse_sse_lines(stream_r.text)
-    event_types = [e["event"] for e in events]
-    assert "permission_request" in event_types

@@ -1,9 +1,7 @@
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useChatStore } from '@/stores/chatStore'
 import type { ToolCall, ToolResult } from '@/types'
-import { Wrench, Check, X, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
+import { Wrench, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
 
 type ToolCallStatus = 'pending' | 'running' | 'done' | 'error' | 'rejected'
 
@@ -38,7 +36,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** 解析各种 tool result 格式，提取可读文本 */
+/** Parse the various tool result formats and extract readable text */
 function extractResultText(raw: string): string {
   let parsed: unknown
   try {
@@ -124,7 +122,6 @@ function getSummary(toolName: string, args: Record<string, unknown>): string {
 }
 
 export function ToolCallCard({ toolCall, result }: ToolCallCardProps) {
-  const approve = useChatStore((s) => s.approveToolCall)
   const [argsExpanded, setArgsExpanded] = useState(false)
   const [resultExpanded, setResultExpanded] = useState(false)
 
@@ -177,27 +174,6 @@ export function ToolCallCard({ toolCall, result }: ToolCallCardProps) {
             )}
             <span>Result</span>
           </button>
-        )}
-
-        {!result && status === 'running' && (
-          <div className="flex gap-1.5 ml-auto">
-            <Button
-              size="sm"
-              variant="default"
-              onClick={() => approve(toolCall.toolCallId, true)}
-              className="rounded text-xs h-6 px-2.5"
-            >
-              <Check className="h-2.5 w-2.5 mr-1" /> Approve
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => approve(toolCall.toolCallId, false)}
-              className="rounded text-xs h-6 px-2.5"
-            >
-              <X className="h-2.5 w-2.5 mr-1" /> Reject
-            </Button>
-          </div>
         )}
       </div>
 

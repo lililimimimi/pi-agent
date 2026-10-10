@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { useDialogFocus } from '@/hooks/useFocusManagement'
 
 type DeleteProjectDialogProps = {
   projectName: string
@@ -17,6 +18,8 @@ export function DeleteProjectDialog({
   onCancel,
   onConfirm,
 }: DeleteProjectDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(dialogRef)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel()
@@ -28,6 +31,7 @@ export function DeleteProjectDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4" onClick={onCancel}>
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-project-title"

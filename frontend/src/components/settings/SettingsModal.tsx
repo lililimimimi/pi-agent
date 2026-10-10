@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { reportError } from '@/lib/appError'
 import type { ProviderInfo } from '@/services/api/providers'
 import type { CatalogGroup } from '@/services/api/models'
+import { useDialogFocus } from '@/hooks/useFocusManagement'
 
 type SettingsModalProps = {
   open: boolean
@@ -41,11 +42,16 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     if (open) setTab('providers')
   }
 
+  useDialogFocus(overlayRef, open)
+
   if (!open) return null
 
   return (
     <div
       ref={overlayRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm"
       onMouseDown={(e) => {
         if (e.target === overlayRef.current) onClose()
@@ -54,7 +60,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
       <div className="bg-card rounded-2xl shadow-2xl border border-border/50 w-[min(960px,calc(100vw-48px))] h-[min(720px,calc(100vh-64px))] flex flex-col overflow-hidden">
         {/* Title bar */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/40">
-          <h2 className="text-base font-semibold tracking-tight">Settings</h2>
+          <h2 id="settings-title" className="text-base font-semibold tracking-tight">
+            Settings
+          </h2>
           <button
             onClick={onClose}
             className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"

@@ -1,5 +1,6 @@
 import express from 'express'
 import { ensureRuntime, PROVIDER_KEY_ENV } from '../runtime.js'
+import { sendError, messageOf } from '../errors.js'
 
 const router = express.Router()
 
@@ -11,8 +12,8 @@ router.post('/api-keys', async (req, res) => {
     const runtime = await ensureRuntime()
     await runtime.setRuntimeApiKey(provider, apiKey)
     res.json({ status: 'ok' })
-  } catch (err: any) {
-    res.status(400).json({ error: err?.message ?? String(err) })
+  } catch (err: unknown) {
+    sendError(res, 400, 'BRIDGE_ERROR', messageOf(err))
   }
 })
 
@@ -24,8 +25,8 @@ router.get('/api-keys/status', async (_req, res) => {
       configured: runtime.hasConfiguredAuth(provider),
     }))
     res.json(result)
-  } catch (err: any) {
-    res.status(400).json({ error: err?.message ?? String(err) })
+  } catch (err: unknown) {
+    sendError(res, 400, 'BRIDGE_ERROR', messageOf(err))
   }
 })
 
@@ -34,8 +35,8 @@ router.delete('/api-keys/:provider', async (req, res) => {
     const runtime = await ensureRuntime()
     await runtime.removeRuntimeApiKey(req.params.provider)
     res.json({ status: 'ok' })
-  } catch (err: any) {
-    res.status(400).json({ error: err?.message ?? String(err) })
+  } catch (err: unknown) {
+    sendError(res, 400, 'BRIDGE_ERROR', messageOf(err))
   }
 })
 

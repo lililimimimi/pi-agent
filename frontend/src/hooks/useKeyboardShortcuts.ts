@@ -5,6 +5,7 @@ type ShortcutHandlers = {
   onNewChat?: () => void
   onOpenSettings?: () => void
   onFocusInput?: () => void
+  onShowShortcuts?: () => void
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
@@ -29,6 +30,12 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
         case ',': {
           e.preventDefault()
           handlers.onOpenSettings?.()
+          break
+        }
+        // Cmd+Shift+/ (Cmd+?) opens the list of shortcuts
+        case '?': {
+          e.preventDefault()
+          handlers.onShowShortcuts?.()
           break
         }
         case '/': {
