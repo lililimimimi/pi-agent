@@ -1,6 +1,7 @@
 import express from 'express'
 import { ensureRuntime, PROVIDER_ALIAS } from '../runtime.js'
 import { clearLoginSession, getLoginSession, startLogin } from '../login.js'
+import { sendError, messageOf } from '../errors.js'
 
 const router = express.Router()
 
@@ -8,7 +9,7 @@ const router = express.Router()
 router.post('/auth/login', async (req, res) => {
   const provider = typeof req.body?.provider === 'string' ? req.body.provider : ''
   if (!provider) {
-    res.status(400).json({ error: 'provider is required' })
+    sendError(res, 400, 'INVALID_REQUEST', 'provider is required')
     return
   }
   try {
@@ -18,15 +19,15 @@ router.post('/auth/login', async (req, res) => {
       runtime.login(sdkId, 'oauth', { ...interaction, signal: new AbortController().signal }),
     )
     res.json({ status: session.status })
-  } catch (err: any) {
-    res.status(400).json({ error: err?.message ?? String(err) })
+  } catch (err: unknown) {
+    sendError(res, 400, 'BRIDGE_ERROR', messageOf(err))
   }
 })
 
 router.post('/auth/logout', async (req, res) => {
   const provider = typeof req.body?.provider === 'string' ? req.body.provider : ''
   if (!provider) {
-    res.status(400).json({ error: 'provider is required' })
+    sendError(res, 400, 'INVALID_REQUEST', 'provider is required')
     return
   }
   try {
@@ -34,8 +35,8 @@ router.post('/auth/logout', async (req, res) => {
     await runtime.logout(PROVIDER_ALIAS[provider] ?? provider)
     clearLoginSession(provider)
     res.json({ status: 'ok' })
-  } catch (err: any) {
-    res.status(400).json({ error: err?.message ?? String(err) })
+  } catch (err: unknown) {
+    sendError(res, 400, 'BRIDGE_ERROR', messageOf(err))
   }
 })
 

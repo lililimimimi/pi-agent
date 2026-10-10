@@ -14,6 +14,7 @@ import { resolveSessionCwd } from '../cwd.js'
 import { pickModelForImages, supportsImages } from '../vision.js'
 import { getModelRuntime, MODEL_ALIASES, PROVIDER_ALIAS, PROVIDER_DEFAULT_MODEL } from '../runtime.js'
 import { previewRegistry, sessions } from '../state.js'
+import { log } from '../logger.js'
 
 const HOME_DIR = homedir()
 
@@ -66,7 +67,7 @@ router.use(express.json({ limit: '20mb' }))
 router.post('/chat', async (req, res) => {
   // Correlation ID from the backend, so bridge logs join the same chain
   const cid: string = typeof req.body?.cid === 'string' ? req.body.cid : '-'
-  console.log(`[bridge] cid=${cid} POST /chat model=${req.body?.model} provider=${req.body?.provider}`)
+  log.info(`cid=${cid} POST /chat model=${req.body?.model} provider=${req.body?.provider}`)
   const {
     messages,
     model: rawModel,
@@ -99,9 +100,9 @@ router.post('/chat', async (req, res) => {
 
   let runtime: ModelRuntime
   try {
-    console.log(`[bridge] getModelRuntime provider=${provider}`)
+    log.info(`getModelRuntime provider=${provider}`)
     runtime = await getModelRuntime(provider)
-    console.log(`[bridge] runtime ready`)
+    log.info(`runtime ready`)
   } catch (err: unknown) {
     send('error', { message: err instanceof Error ? err.message : 'Failed to init runtime' })
     send('done', {})
@@ -117,10 +118,10 @@ router.post('/chat', async (req, res) => {
     const fallbackId = PROVIDER_DEFAULT_MODEL[provider] ?? PROVIDER_DEFAULT_MODEL[rawProvider]
     if (fallbackId) {
       model = runtime.getModel(provider, fallbackId)
-      console.log(`[bridge] model ${modelId} not found, fallback to ${fallbackId} found=${!!model}`)
+      log.info(`model ${modelId} not found, fallback to ${fallbackId} found=${!!model}`)
     }
   } else {
-    console.log(`[bridge] model resolved: ${provider}/${modelId} found=${!!model}`)
+    log.info(`model resolved: ${provider}/${modelId} found=${!!model}`)
   }
 
   // Images are only sent to models that accept them. For other models, switch to
@@ -148,7 +149,7 @@ router.post('/chat', async (req, res) => {
 
   let session: AgentSession
   try {
-    console.log(`[bridge] createAgentSession...`)
+    log.info(`createAgentSession...`)
     let resourceLoader: DefaultResourceLoader | undefined
     // The loader carries the execution-preview extension and the project rules
     if (previewCtrl.enabled || rules) {

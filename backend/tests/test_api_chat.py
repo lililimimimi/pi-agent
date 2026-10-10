@@ -166,42 +166,6 @@ async def test_stream_unknown_session_returns_404(client: AsyncClient):
     assert r.status_code == 404
 
 
-async def test_approve_tool_returns_ok(client: AsyncClient):
-    """POST /api/tool/approve on a valid session returns {status: ok}."""
-    r = await client.post(
-        "/api/chat",
-        json={
-            "messages": [{"role": "user", "content": "hi"}],
-            "provider": "mock",
-            "model": "mock-1",
-        },
-    )
-    session_id = r.json()["session_id"]
-
-    r2 = await client.post(
-        "/api/tool/approve",
-        json={
-            "session_id": session_id,
-            "tool_call_id": "tc-fake-123",
-            "approved": True,
-        },
-    )
-    assert r2.status_code == 200
-    assert r2.json() == {"status": "ok"}
-
-
-async def test_approve_unknown_session_returns_404(client: AsyncClient):
-    r = await client.post(
-        "/api/tool/approve",
-        json={
-            "session_id": "ghost-session",
-            "tool_call_id": "tc-1",
-            "approved": False,
-        },
-    )
-    assert r.status_code == 404
-
-
 async def test_stream_bridge_error_is_proxied(client: AsyncClient):
     """If bridge returns an error event, it is proxied through."""
     r = await client.post(

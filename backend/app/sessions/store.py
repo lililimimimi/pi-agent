@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from app.errors import ConflictError, InvalidRequestError, NotFoundError
+from app.fileio import write_text_atomic
 from app.logging import get_logger
 from app.sessions.models import (
     Project,
@@ -54,7 +55,7 @@ def create_session(title: str = "", project_id: str = "") -> SessionMeta:
     sid = str(uuid.uuid4())
     meta = SessionMeta(id=sid, title=title, project_id=project_id)
     path = _sessions_dir() / f"{sid}.jsonl"
-    path.write_text(meta.model_dump_json() + "\n", encoding="utf-8")
+    write_text_atomic(path, meta.model_dump_json() + "\n")
     return meta
 
 
@@ -89,7 +90,7 @@ def truncate_before_user_message(session_id: str, user_index: int) -> None:
             continue
         if json.loads(line).get("role") == "user":
             if seen == user_index:
-                path.write_text("".join(lines[:i]), encoding="utf-8")
+                write_text_atomic(path, "".join(lines[:i]))
                 return
             seen += 1
     raise ConflictError(f"Session '{session_id}' has no user message #{user_index}")
@@ -106,7 +107,7 @@ def update_title(session_id: str, title: str) -> None:
     meta = json.loads(lines[0])
     meta["title"] = title
     lines[0] = json.dumps(meta, ensure_ascii=False) + "\n"
-    path.write_text("".join(lines), encoding="utf-8")
+    write_text_atomic(path, "".join(lines))
 
 
 # ── Pi native session helpers ──────────────────────────────────────────────────
@@ -259,30 +260,36 @@ def session_file(session_id: str) -> Path | None:
     return _find_pi_native_session(session_id)
 
 
-def get_session(session_id: str) -> list[dict[str, Any]]:
-    """Read all records from a session file. Returns list of raw dicts.
+_PI_SKIP_TYPES = {"session", "session_info", "model_change", "thinking_level_change"}
 
-    Checks our own format first, then falls back to Pi native format.
-    """
-    # Our own format
-    path = _sessions_dir() / f"{session_id}.jsonl"
-    if path.exists():
-        records: list[dict[str, Any]] = []
-        for line in path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
+
+def _read_own_records(path: Path) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line:
             records.append(json.loads(line))
-        return records
+    return records
 
-    # Pi native format
-    pi_path = _find_pi_native_session(session_id)
-    if pi_path is None:
-        raise NotFoundError(f"Session '{session_id}' not found")
 
-    _SKIP_TYPES = {"session", "session_info", "model_change", "thinking_level_change"}
-    records = []
-    for line in pi_path.read_text(encoding="utf-8").splitlines():
+def _pi_message_record(row: dict[str, Any]) -> dict[str, Any] | None:
+    """Turn one Pi native row into a message record, or None if it is not shown."""
+    if row.get("type") != "message" or not isinstance(row.get("message"), dict):
+        return None
+    msg = row["message"]
+    role = msg.get("role", "")
+    if role == "toolResult":
+        return None
+    return {
+        "type": "message",
+        "role": role,
+        "content": _extract_pi_text(msg.get("content", "")),
+    }
+
+
+def _read_pi_records(path: Path) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
@@ -290,26 +297,27 @@ def get_session(session_id: str) -> list[dict[str, Any]]:
             row = json.loads(line)
         except json.JSONDecodeError:
             continue
-
-        row_type = row.get("type", "")
-        if row_type in _SKIP_TYPES:
+        if row.get("type", "") in _PI_SKIP_TYPES:
             continue
-
-        if row_type == "message" and isinstance(row.get("message"), dict):
-            msg = row["message"]
-            role = msg.get("role", "")
-            if role == "toolResult":
-                continue
-            text = _extract_pi_text(msg.get("content", ""))
-            records.append(
-                {
-                    "type": "message",
-                    "role": role,
-                    "content": text,
-                }
-            )
-
+        record = _pi_message_record(row)
+        if record is not None:
+            records.append(record)
     return records
+
+
+def get_session(session_id: str) -> list[dict[str, Any]]:
+    """Read all records from a session file. Returns list of raw dicts.
+
+    Checks our own format first, then falls back to Pi native format.
+    """
+    path = _sessions_dir() / f"{session_id}.jsonl"
+    if path.exists():
+        return _read_own_records(path)
+
+    pi_path = _find_pi_native_session(session_id)
+    if pi_path is None:
+        raise NotFoundError(f"Session '{session_id}' not found")
+    return _read_pi_records(pi_path)
 
 
 def delete_session(session_id: str) -> None:
@@ -353,9 +361,7 @@ def _load_projects() -> list[dict[str, Any]]:
 
 def _save_projects(projects: list[dict[str, Any]]) -> None:
     path = _projects_path()
-    path.write_text(
-        json.dumps(projects, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    write_text_atomic(path, json.dumps(projects, ensure_ascii=False, indent=2) + "\n")
 
 
 def create_project(name: str, dir_path: str) -> Project:

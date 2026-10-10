@@ -25,6 +25,7 @@ from app.errors import (
     NotFoundError,
     NotImplementedHereError,
 )
+from app.fileio import write_text_atomic
 from app.logging import get_logger
 from app.schemas import RevealResponse
 from app.services.project_rename import rename_project
@@ -48,8 +49,8 @@ def _load_ignored() -> set[str]:
 
 def _save_ignored(paths: set[str]) -> None:
     _IGNORED_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _IGNORED_FILE.write_text(
-        json.dumps(sorted(paths), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    write_text_atomic(
+        _IGNORED_FILE, json.dumps(sorted(paths), indent=2, ensure_ascii=False) + "\n"
     )
 
 

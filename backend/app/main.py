@@ -15,7 +15,7 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv()  # 自动读取 backend/.env
+load_dotenv()  # reads backend/.env
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -31,8 +31,8 @@ setup_logging(level=os.getenv("LOG_LEVEL", "DEBUG"))
 # Sync Pi CLI OAuth + env-var API keys → config.json (used by the model settings UI)
 from app.config.sync import sync_env_vars_to_config, sync_pi_oauth_to_config
 
-sync_pi_oauth_to_config()  # Pi CLI OAuth (Claude.ai 订阅)
-sync_env_vars_to_config()  # env vars (ANTHROPIC_API_KEY 等)
+sync_pi_oauth_to_config()  # Pi CLI OAuth (Claude.ai subscription)
+sync_env_vars_to_config()  # env vars (ANTHROPIC_API_KEY etc.)
 from app.config.sync import sync_codex_login_to_config
 
 sync_codex_login_to_config()  # OpenAI subscription login (Pi auth.json)

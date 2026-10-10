@@ -3,7 +3,6 @@ Chat API routes:
   POST /api/chat              → create session, return {session_id}
   GET  /api/chat/stream/{id}  → stream one reply from pi-bridge
   POST /api/chat/stop/{id}    → stop the reply being written
-  POST /api/tool/approve      → signal approval decision for a paused tool call
   GET  /api/health            → liveness probe
 """
 
@@ -18,19 +17,13 @@ from pydantic import BaseModel
 from app.logging import get_logger, new_correlation_id, set_correlation_id
 from app.schemas import StatusResponse
 from app.services.chat_content import parse_content
-from app.services.chat_sessions import get_chat_session, open_chat
+from app.services.chat_sessions import find_chat_session, get_chat_session, open_chat
 from app.services.chat_stream import stream_turn
 from app.types import Message, Role
 
 log = get_logger(__name__)
 
 router = APIRouter(prefix="/api")
-
-
-class ApproveRequest(BaseModel):
-    session_id: str
-    tool_call_id: str
-    approved: bool
 
 
 @router.get("/health")
@@ -91,16 +84,8 @@ async def stream_chat(session_id: str) -> StreamingResponse:
 
 @router.post("/chat/stop/{session_id}")
 async def stop_chat(session_id: str) -> StatusResponse:
-    """The user pressed Stop: keep the text written so far and end the reply there."""
-    get_chat_session(session_id).stop()
-    return StatusResponse(status="ok")
-
-
-@router.post("/tool/approve")
-async def approve_tool(req: ApproveRequest) -> StatusResponse:
-    session = get_chat_session(req.session_id)
-    session.approval_results[req.tool_call_id] = req.approved
-    event = session.approval_events.get(req.tool_call_id)
-    if event is not None:
-        event.set()
+    """The user pressed Stop: keep the text written so far. If the reply has already finished, there is nothing to stop."""
+    session = find_chat_session(session_id)
+    if session is not None:
+        session.stop()
     return StatusResponse(status="ok")

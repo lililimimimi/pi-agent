@@ -12,15 +12,12 @@ calls are forwarded to it.
 
 from __future__ import annotations
 
-import os
-
 import httpx
 from fastapi import APIRouter
 
 from app.errors import NotFoundError, UpstreamError
 from app.schemas import StatusResponse
-
-BRIDGE_URL = os.getenv("PI_BRIDGE_URL", "http://localhost:3100")
+from app.services.bridge import BRIDGE_URL
 
 router = APIRouter(prefix="/api")
 
