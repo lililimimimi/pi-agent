@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { createCustomProvider } from '@/services/api'
+import { createCustomProvider } from '@/services/api/providers'
 
 type Props = {
   open: boolean
@@ -51,7 +51,13 @@ export function AddProviderDialog({ open, onOpenChange, onAdded }: Props) {
   const canSubmit = name.trim() && baseUrl.trim() && apiKey.trim() && !saving
 
   return (
-    <Dialog.Root open={open} onOpenChange={(next) => { if (!next) reset(); onOpenChange(next) }}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) reset()
+        onOpenChange(next)
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-[60] bg-black/20 backdrop-blur-sm" />
         <Dialog.Popup className="fixed left-1/2 top-1/2 z-[70] w-[min(420px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border/50 bg-card p-6 shadow-2xl">
@@ -67,19 +73,38 @@ export function AddProviderDialog({ open, onOpenChange, onAdded }: Props) {
 
           <form
             className="mt-5 space-y-4"
-            onSubmit={(e) => { e.preventDefault(); if (canSubmit) void submit() }}
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (canSubmit) void submit()
+            }}
           >
             <label className="block space-y-1.5">
               <span className="text-sm font-medium">Name</span>
-              <input className={FIELD} value={name} onChange={(e) => setName(e.target.value)} placeholder="My provider" />
+              <input
+                className={FIELD}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="My provider"
+              />
             </label>
             <label className="block space-y-1.5">
               <span className="text-sm font-medium">Base URL</span>
-              <input className={FIELD} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.example.com/v1" />
+              <input
+                className={FIELD}
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder="https://api.example.com/v1"
+              />
             </label>
             <label className="block space-y-1.5">
               <span className="text-sm font-medium">API key</span>
-              <input className={FIELD} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-…" />
+              <input
+                className={FIELD}
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-…"
+              />
             </label>
 
             {error && <p className="text-sm text-destructive">{error}</p>}

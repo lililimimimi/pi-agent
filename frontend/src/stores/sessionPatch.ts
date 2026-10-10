@@ -18,7 +18,10 @@ export type SessionState = {
 export type ProjectState = SessionState & { projects: Project[] }
 
 export type SessionPatch = Partial<
-  Pick<ProjectState, 'sessions' | 'activeId' | 'activeProjectId' | 'messages' | 'sessionId' | 'tokenUsage' | 'projects'>
+  Pick<
+    ProjectState,
+    'sessions' | 'activeId' | 'activeProjectId' | 'messages' | 'sessionId' | 'tokenUsage' | 'projects'
+  >
 > & {
   error?: string | null
 }
@@ -44,7 +47,7 @@ export function savedSessions(state: SessionState): SessionSnapshot[] {
   return state.sessions.map((s) =>
     s.id === state.activeId
       ? { ...s, messages: state.messages, tokenUsage: state.tokenUsage, backendSessionId: state.sessionId }
-      : s
+      : s,
   )
 }
 
@@ -70,7 +73,14 @@ export function removeSessionsPatch(state: SessionState, removeIds: Set<string>)
 
   if (remaining.length === 0) {
     const fresh = makeSession(state.activeProjectId)
-    return { sessions: [fresh], activeId: fresh.id, messages: [], sessionId: null, tokenUsage: emptyUsage(), error: null }
+    return {
+      sessions: [fresh],
+      activeId: fresh.id,
+      messages: [],
+      sessionId: null,
+      tokenUsage: emptyUsage(),
+      error: null,
+    }
   }
 
   if (removeIds.has(state.activeId)) {

@@ -47,7 +47,11 @@ describe('ToolCallCard', () => {
 
   it('toggles arguments full JSON on click', async () => {
     const user = userEvent.setup()
-    const tc: ToolCall = { toolCallId: 'tc-2', toolName: 'bash', arguments: { command: 'echo hello', verbose: true } }
+    const tc: ToolCall = {
+      toolCallId: 'tc-2',
+      toolName: 'bash',
+      arguments: { command: 'echo hello', verbose: true },
+    }
     render(<ToolCallCard toolCall={tc} />)
 
     // Full JSON not visible by default

@@ -1,16 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
-vi.mock('@/services/api', () => ({
+vi.mock('@/services/api/models', () => ({
   fetchModels: vi.fn(),
 }))
 
-import { fetchModels } from '@/services/api'
+import { fetchModels } from '@/services/api/models'
 import { ModelSelector } from '@/components/model/ModelSelector'
 
 const ENABLED = [
-  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'deepseek', supports_tools: true, supports_images: false, status: { ok: true, ms: 500 } },
-  { id: 'deepseek-v4-flash-vision-exp', name: 'DeepSeek V4 Flash Vision', provider: 'deepseek', supports_tools: true, supports_images: true, status: { ok: false, error: 'out of extra usage' } },
+  {
+    id: 'deepseek-v4-flash',
+    name: 'DeepSeek V4 Flash',
+    provider: 'deepseek',
+    supports_tools: true,
+    supports_images: false,
+    status: { ok: true, ms: 500 },
+  },
+  {
+    id: 'deepseek-v4-flash-vision-exp',
+    name: 'DeepSeek V4 Flash Vision',
+    provider: 'deepseek',
+    supports_tools: true,
+    supports_images: true,
+    status: { ok: false, error: 'out of extra usage' },
+  },
 ]
 
 beforeEach(() => {

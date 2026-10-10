@@ -2,7 +2,7 @@
  * Converts messages between the chat screen and the API / saved session records.
  * Pure functions: no store state, so they are easy to test on their own.
  */
-import type { ContentPart } from '@/services/api'
+import type { ContentPart } from '@/services/api/chat'
 import type { Message } from '@/types'
 import { parseDataUrl, stripImageMarker } from '@/lib/image'
 

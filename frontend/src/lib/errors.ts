@@ -5,18 +5,28 @@
 export type FriendlyError = { title: string; detail: string }
 
 const RULES: Array<{ test: RegExp; title: string }> = [
-  { test: /not supported when using codex|chatgpt account/i,
-    title: 'This model is not available with your ChatGPT subscription. Choose another model.' },
-  { test: /out of extra usage|usage limit|quota|insufficient|rate limit|429/i,
-    title: 'This account is out of usage. Add usage or switch to another model.' },
-  { test: /401|403|invalid.*key|unauthori[sz]ed|authentication|api key/i,
-    title: 'The API key was rejected. Check it in Settings.' },
-  { test: /404|model not found|does not exist|not found/i,
-    title: 'This model is not available for your account.' },
-  { test: /timed out|timeout/i,
-    title: 'The request timed out. Try again.' },
-  { test: /pi-bridge unreachable|502|econn|fetch failed|network|refused/i,
-    title: 'Cannot reach the local service. Check that pi-bridge and the backend are running.' },
+  {
+    test: /not supported when using codex|chatgpt account/i,
+    title: 'This model is not available with your ChatGPT subscription. Choose another model.',
+  },
+  {
+    test: /out of extra usage|usage limit|quota|insufficient|rate limit|429/i,
+    title: 'This account is out of usage. Add usage or switch to another model.',
+  },
+  {
+    test: /401|403|invalid.*key|unauthori[sz]ed|authentication|api key/i,
+    title: 'The API key was rejected. Check it in Settings.',
+  },
+  {
+    test: /404|model not found|model .*does not exist/i,
+    title: 'This model is not available for your account.',
+  },
+  { test: /Pi's own format/i, title: "This chat can't be edited here. Start a new chat to change it." },
+  { test: /timed out|timeout/i, title: 'The request timed out. Try again.' },
+  {
+    test: /pi-bridge unreachable|502|econn|fetch failed|network|refused/i,
+    title: 'Cannot reach the local service. Check that pi-bridge and the backend are running.',
+  },
 ]
 
 /** Pulls the human sentence out of a provider's JSON error, if there is one. */

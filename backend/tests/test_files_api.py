@@ -3,6 +3,7 @@ Tests for the project file browser endpoints (/api/files/tree, /api/files/conten
 
 Covers tree construction, ignore rules, lazy depth, and path-safety checks.
 """
+
 from __future__ import annotations
 
 import os
@@ -15,6 +16,7 @@ from httpx import ASGITransport, AsyncClient
 @pytest.fixture
 async def client():
     from app.main import app
+
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as c:
@@ -50,6 +52,7 @@ def _names(node: dict) -> list[str]:
 # Tree
 # --------------------------------------------------------------------------- #
 
+
 async def test_tree_lists_root_dirs_before_files(client: AsyncClient, project: Path):
     r = await client.get("/api/files/tree", params={"root": str(project)})
 
@@ -62,7 +65,9 @@ async def test_tree_lists_root_dirs_before_files(client: AsyncClient, project: P
     assert _names(body) == ["src", "big.txt", "image.bin", "README.md"]
 
 
-async def test_tree_ignores_node_modules_git_pycache_and_pyc(client: AsyncClient, project: Path):
+async def test_tree_ignores_node_modules_git_pycache_and_pyc(
+    client: AsyncClient, project: Path
+):
     r = await client.get("/api/files/tree", params={"root": str(project), "depth": 10})
 
     names = set()
@@ -81,19 +86,25 @@ async def test_tree_ignores_node_modules_git_pycache_and_pyc(client: AsyncClient
 
 
 async def test_tree_depth_controls_expansion(client: AsyncClient, project: Path):
-    shallow = (await client.get("/api/files/tree", params={"root": str(project), "depth": 1})).json()
+    shallow = (
+        await client.get("/api/files/tree", params={"root": str(project), "depth": 1})
+    ).json()
     src = next(c for c in shallow["children"] if c["name"] == "src")
     # Beyond requested depth → not expanded
     assert src["children"] is None
 
-    deep = (await client.get("/api/files/tree", params={"root": str(project), "depth": 2})).json()
+    deep = (
+        await client.get("/api/files/tree", params={"root": str(project), "depth": 2})
+    ).json()
     src = next(c for c in deep["children"] if c["name"] == "src")
     components = next(c for c in src["children"] if c["name"] == "components")
     assert components["children"] is None
     assert "App.tsx" in _names(src)
 
 
-async def test_tree_file_nodes_have_relative_path_and_size(client: AsyncClient, project: Path):
+async def test_tree_file_nodes_have_relative_path_and_size(
+    client: AsyncClient, project: Path
+):
     r = await client.get("/api/files/tree", params={"root": str(project), "depth": 2})
     src = next(c for c in r.json()["children"] if c["name"] == "src")
     app = next(c for c in src["children"] if c["name"] == "App.tsx")
@@ -103,7 +114,9 @@ async def test_tree_file_nodes_have_relative_path_and_size(client: AsyncClient, 
     assert app["size"] == len("export const App = () => null\n")
 
 
-async def test_tree_subdir_paths_are_relative_to_root(client: AsyncClient, project: Path):
+async def test_tree_subdir_paths_are_relative_to_root(
+    client: AsyncClient, project: Path
+):
     r = await client.get(
         "/api/files/tree",
         params={"root": str(project), "dir": "src/components", "depth": 1},
@@ -115,7 +128,9 @@ async def test_tree_subdir_paths_are_relative_to_root(client: AsyncClient, proje
     assert body["children"][0]["path"] == "src/components/ChatPanel.tsx"
 
 
-async def test_tree_skips_symlink_escaping_root(client: AsyncClient, project: Path, tmp_path: Path):
+async def test_tree_skips_symlink_escaping_root(
+    client: AsyncClient, project: Path, tmp_path: Path
+):
     os.symlink(tmp_path / "secret.txt", project / "leak.txt")
 
     r = await client.get("/api/files/tree", params={"root": str(project), "depth": 1})
@@ -134,13 +149,16 @@ async def test_tree_root_is_file_returns_400(client: AsyncClient, project: Path)
 
 
 async def test_tree_subdir_is_file_returns_400(client: AsyncClient, project: Path):
-    r = await client.get("/api/files/tree", params={"root": str(project), "dir": "README.md"})
+    r = await client.get(
+        "/api/files/tree", params={"root": str(project), "dir": "README.md"}
+    )
     assert r.status_code == 400
 
 
 # --------------------------------------------------------------------------- #
 # Content
 # --------------------------------------------------------------------------- #
+
 
 async def test_content_returns_text(client: AsyncClient, project: Path):
     r = await client.get(
@@ -163,7 +181,9 @@ async def test_content_rejects_parent_traversal(client: AsyncClient, project: Pa
     assert r.status_code == 403
 
 
-async def test_content_rejects_absolute_path(client: AsyncClient, project: Path, tmp_path: Path):
+async def test_content_rejects_absolute_path(
+    client: AsyncClient, project: Path, tmp_path: Path
+):
     r = await client.get(
         "/api/files/content",
         params={"root": str(project), "path": str(tmp_path / "secret.txt")},
@@ -171,7 +191,9 @@ async def test_content_rejects_absolute_path(client: AsyncClient, project: Path,
     assert r.status_code == 403
 
 
-async def test_content_rejects_symlink_escaping_root(client: AsyncClient, project: Path, tmp_path: Path):
+async def test_content_rejects_symlink_escaping_root(
+    client: AsyncClient, project: Path, tmp_path: Path
+):
     os.symlink(tmp_path / "secret.txt", project / "leak.txt")
 
     r = await client.get(

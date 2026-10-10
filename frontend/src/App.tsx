@@ -8,7 +8,7 @@ import { Sidebar } from '@/components/sidebar/Sidebar'
 import { FilePreview } from '@/components/files/FilePreview'
 import { SettingsModal } from '@/components/settings/SettingsModal'
 import { ApprovalModal } from '@/components/chat/ApprovalModal'
-import { useToast } from '@/components/Toast'
+import { useToast } from '@/components/useToast'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { useChatStore } from '@/stores/chatStore'
@@ -21,6 +21,18 @@ function WorkingDirectory() {
   return (
     <span className="max-w-[260px] truncate text-sm text-muted-foreground" title={path ?? 'Home folder'}>
       {path ?? '~ (home)'}
+    </span>
+  )
+}
+
+// Shown in the header while the agent waits for the user: a tool approval or an execution preview.
+// Nothing times out, so this is how the user can tell the agent is waiting on them.
+function AwaitingApproval() {
+  const waiting = useChatStore((s) => s.agentStatus === 'awaiting_approval' || s.executionPreview !== null)
+  if (!waiting) return null
+  return (
+    <span role="status" className="text-sm font-medium text-amber-600 whitespace-nowrap">
+      Awaiting approval
     </span>
   )
 }
@@ -92,7 +104,10 @@ function ActiveApprovalModal() {
   // Find the first pending request
   let activeRequest = undefined
   for (const req of permissionRequests.values()) {
-    if (req.status === 'pending') { activeRequest = req; break }
+    if (req.status === 'pending') {
+      activeRequest = req
+      break
+    }
   }
   if (!activeRequest) return null
   return <ApprovalModal request={activeRequest} />
@@ -120,21 +135,28 @@ export function App() {
 
   // ── Toast + Network status ──
   const { showToast } = useToast()
-  const networkCallbacks = useMemo(() => ({
-    onOffline: () => showToast({ type: 'error', message: 'Network connection lost. Check your network.', duration: 0 }),
-    onOnline: () => showToast({ type: 'success', message: 'Network connection restored.' }),
-  }), [showToast])
+  const networkCallbacks = useMemo(
+    () => ({
+      onOffline: () =>
+        showToast({ type: 'error', message: 'Network connection lost. Check your network.', duration: 0 }),
+      onOnline: () => showToast({ type: 'success', message: 'Network connection restored.' }),
+    }),
+    [showToast],
+  )
   useNetworkStatus(networkCallbacks)
 
   // ── Keyboard shortcuts ──
-  const shortcutHandlers = useMemo(() => ({
-    onNewChat: newSession,
-    onOpenSettings: () => setSettingsOpen(true),
-    onFocusInput: () => {
-      const textarea = document.querySelector<HTMLTextAreaElement>('textarea[placeholder="Message pi…"]')
-      textarea?.focus()
-    },
-  }), [newSession])
+  const shortcutHandlers = useMemo(
+    () => ({
+      onNewChat: newSession,
+      onOpenSettings: () => setSettingsOpen(true),
+      onFocusInput: () => {
+        const textarea = document.querySelector<HTMLTextAreaElement>('textarea[placeholder="Message pi…"]')
+        textarea?.focus()
+      },
+    }),
+    [newSession],
+  )
   useKeyboardShortcuts(shortcutHandlers)
 
   useEffect(() => {
@@ -171,53 +193,54 @@ export function App() {
       {sidebarOpen && <Sidebar onSettingsClick={() => setSettingsOpen(true)} />}
 
       <div className="flex flex-1 min-w-0 overflow-hidden">
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        {/* Header */}
-        <header className="flex items-center gap-3 px-4 h-[61px] bg-background/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-30">
-          <button
-            onClick={() => setSidebarOpen((v) => !v)}
-            title={sidebarOpen ? 'Hide Sidebar (⌘B)' : 'Show Sidebar (⌘B)'}
-            className="w-8 h-8 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <PanelLeft className="h-4 w-4" strokeWidth={1.8} />
-          </button>
-          <div className="flex-1" />
-          <WorkingDirectory />
-          <ContextBar />
-          <TokenCounter />
-          <ModelSelector />
-        </header>
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          {/* Header */}
+          <header className="flex items-center gap-3 px-4 h-[61px] bg-background/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-30">
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              title={sidebarOpen ? 'Hide Sidebar (⌘B)' : 'Show Sidebar (⌘B)'}
+              className="w-8 h-8 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <PanelLeft className="h-4 w-4" strokeWidth={1.8} />
+            </button>
+            <div className="flex-1" />
+            <AwaitingApproval />
+            <WorkingDirectory />
+            <ContextBar />
+            <TokenCounter />
+            <ModelSelector />
+          </header>
 
-        {/* ── Empty state: greeting + input centered ── */}
-        {isEmpty ? (
-          <div className="flex-1 flex flex-col items-center justify-center px-6 pb-16">
-            {/* Greeting */}
-            <div className="text-center select-none mb-8">
-              <div className="flex items-center justify-center w-20 h-20 rounded-3xl bg-foreground/[0.05] mx-auto mb-6">
-                <span className="text-5xl font-bold leading-none" style={PI_GRADIENT}>π</span>
+          {/* ── Empty state: greeting + input centered ── */}
+          {isEmpty ? (
+            <div className="flex-1 flex flex-col items-center justify-center px-6 pb-16">
+              {/* Greeting */}
+              <div className="text-center select-none mb-8">
+                <div className="flex items-center justify-center w-20 h-20 rounded-3xl bg-foreground/[0.05] mx-auto mb-6">
+                  <span className="text-5xl font-bold leading-none" style={PI_GRADIENT}>
+                    π
+                  </span>
+                </div>
+                <p className="text-2xl font-semibold tracking-tight text-foreground/75">pi</p>
+                <p className="text-sm text-muted-foreground mt-2 font-normal">How can I help you today?</p>
               </div>
-              <p className="text-2xl font-semibold tracking-tight text-foreground/75">pi</p>
-              <p className="text-sm text-muted-foreground mt-2 font-normal">
-                How can I help you today?
-              </p>
-            </div>
 
-            {/* Input — same style, but centered here */}
-            <div className="w-full max-w-2xl">
-              <InputBar bare />
+              {/* Input — same style, but centered here */}
+              <div className="w-full max-w-2xl">
+                <InputBar bare />
+              </div>
             </div>
-          </div>
-        ) : (
-          /* ── Normal state: messages + input pinned bottom ── */
-          <>
-            <ChatView />
-            <InputBar />
-            <ActiveApprovalModal />
-          </>
-        )}
-      </div>
+          ) : (
+            /* ── Normal state: messages + input pinned bottom ── */
+            <>
+              <ChatView />
+              <InputBar />
+              <ActiveApprovalModal />
+            </>
+          )}
+        </div>
 
-      <FilePreview />
+        <FilePreview />
       </div>
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />

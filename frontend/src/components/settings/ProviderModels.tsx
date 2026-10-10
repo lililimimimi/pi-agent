@@ -3,8 +3,9 @@ import { Collapsible } from '@base-ui/react/collapsible'
 import { Switch } from '@base-ui/react/switch'
 import { ChevronRight, Image as ImageIcon, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { setEnabledModels, testModel, type CatalogGroup, type CatalogModel } from '@/services/api'
+import { setEnabledModels, testModel } from '@/services/api/models'
 import { explainError } from '@/lib/modelStatus'
+import type { CatalogGroup, CatalogModel } from '@/services/api/models'
 
 type Props = {
   group: CatalogGroup
@@ -69,11 +70,11 @@ export function ProviderModels({ group, configured, unconfiguredHint, onChanged 
 
   return (
     <Collapsible.Root open={open} onOpenChange={setOpen} disabled={!configured}>
-      {!configured && (
-        <p className="mb-1.5 text-base text-muted-foreground">{unconfiguredHint}</p>
-      )}
+      {!configured && <p className="mb-1.5 text-base text-muted-foreground">{unconfiguredHint}</p>}
       <div className="flex items-center justify-between gap-2">
-        <Collapsible.Trigger className={`flex items-center gap-1.5 rounded-md px-1 py-0.5 text-base text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${configured ? '' : 'pointer-events-none opacity-50'}`}>
+        <Collapsible.Trigger
+          className={`flex items-center gap-1.5 rounded-md px-1 py-0.5 text-base text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${configured ? '' : 'pointer-events-none opacity-50'}`}
+        >
           <ChevronRight className={`size-4 transition-transform ${open ? 'rotate-90' : ''}`} />
           {enabledCount} of {group.models.length} enabled
         </Collapsible.Trigger>
@@ -123,9 +124,14 @@ export function ProviderModels({ group, configured, unconfiguredHint, onChanged 
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-base" title={m.id}>{m.name}</span>
+                  <span className="truncate text-base" title={m.id}>
+                    {m.name}
+                  </span>
                   {m.supports_images && (
-                    <ImageIcon className="size-3.5 shrink-0 text-muted-foreground" aria-label="Supports images" />
+                    <ImageIcon
+                      className="size-3.5 shrink-0 text-muted-foreground"
+                      aria-label="Supports images"
+                    />
                   )}
                 </div>
                 {m.status && !m.status.ok && (
@@ -144,7 +150,12 @@ export function ProviderModels({ group, configured, unconfiguredHint, onChanged 
                 />
               )}
 
-              <Button variant="ghost" size="sm" onClick={() => test(m)} disabled={testing !== null || !configured}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => test(m)}
+                disabled={testing !== null || !configured}
+              >
                 {testing === m.id ? 'Testing…' : 'Test'}
               </Button>
             </div>

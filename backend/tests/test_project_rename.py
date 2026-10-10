@@ -1,4 +1,5 @@
 """Tests for renaming a project folder: the folder, the project record and its sessions."""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +8,12 @@ from pathlib import Path
 import pytest
 
 from app.services import project_rename
-from app.services.project_rename import RenameError, mark_done, mark_running, rename_project
+from app.services.project_rename import (
+    RenameError,
+    mark_done,
+    mark_running,
+    rename_project,
+)
 from app.sessions import store
 
 
@@ -30,8 +36,10 @@ def env(tmp_path: Path, monkeypatch):
 
     # Our own session: its header names the project folder
     (sessions / "s1.jsonl").write_text(
-        json.dumps({"id": "s1", "title": "chat", "project_id": str(folder)}) + "\n"
-        + json.dumps({"role": "user", "content": "hi"}) + "\n",
+        json.dumps({"id": "s1", "title": "chat", "project_id": str(folder)})
+        + "\n"
+        + json.dumps({"role": "user", "content": "hi"})
+        + "\n",
         encoding="utf-8",
     )
     # A session in another project must not change
@@ -43,8 +51,10 @@ def env(tmp_path: Path, monkeypatch):
     native = sessions / ("--" + str(folder).strip("/").replace("/", "-") + "--")
     native.mkdir()
     (native / "n1.jsonl").write_text(
-        json.dumps({"type": "session", "cwd": str(folder)}) + "\n"
-        + json.dumps({"role": "user", "content": "hello"}) + "\n",
+        json.dumps({"type": "session", "cwd": str(folder)})
+        + "\n"
+        + json.dumps({"role": "user", "content": "hello"})
+        + "\n",
         encoding="utf-8",
     )
     return {"sessions": sessions, "work": work, "folder": folder, "native": native}
@@ -68,7 +78,9 @@ def test_renames_folder_record_sessions_and_native_dir(env):
     other_header = json.loads((env["sessions"] / "s2.jsonl").read_text().split("\n")[0])
     assert other_header["project_id"] == "/elsewhere"
 
-    new_native = env["sessions"] / ("--" + str(new_folder).strip("/").replace("/", "-") + "--")
+    new_native = env["sessions"] / (
+        "--" + str(new_folder).strip("/").replace("/", "-") + "--"
+    )
     assert new_native.is_dir()
     assert not env["native"].exists()
     native_header = json.loads((new_native / "n1.jsonl").read_text().split("\n")[0])
@@ -103,10 +115,12 @@ def test_refuses_while_a_chat_in_the_project_is_running(env):
 
 
 def test_refuses_when_another_project_lives_inside(env):
-    store._save_projects([
-        {"id": "p1", "name": "app", "path": str(env["folder"])},
-        {"id": "p2", "name": "inner", "path": str(env["folder"] / "inner")},
-    ])
+    store._save_projects(
+        [
+            {"id": "p1", "name": "app", "path": str(env["folder"])},
+            {"id": "p2", "name": "inner", "path": str(env["folder"] / "inner")},
+        ]
+    )
     with pytest.raises(RenameError, match="inside this folder"):
         rename_project("p1", "newapp")
     assert env["folder"].exists()

@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useChatStore } from '@/stores/chatStore'
-import { browseDirs, mkdirApi, type BrowseResult } from '@/services/api'
+import { browseDirs, mkdirApi } from '@/services/api/projects'
 import { X, FolderOpen, Folder, ChevronRight, Home, Loader2, FolderPlus, Check } from 'lucide-react'
+import type { BrowseResult } from '@/services/api/projects'
 
 type Props = {
   open: boolean
@@ -23,33 +24,57 @@ export function AddProjectModal({ open, onClose }: Props) {
   const [newFolderLoading, setNewFolderLoading] = useState(false)
   const newFolderRef = useRef<HTMLInputElement>(null)
 
-  const navigate = useCallback(async (path?: string) => {
-    setLoading(true)
-    setError('')
-    setCreatingFolder(false)
-    setNewFolderName('')
-    setNewFolderError('')
-    setNewFolderLoading(false)
-    try {
-      const data = await browseDirs(path)
-      setBrowseData(data)
-      setPathInput(data.current)
-      if (!path) setHomePath(data.current) // the first load (no path) starts in the home folder
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to browse directory')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // Fetches a folder listing. The caller has already set the loading state.
+  const fetchDir = useCallback(
+    (path?: string) =>
+      browseDirs(path)
+        .then(
+          (data) => {
+            setBrowseData(data)
+            setPathInput(data.current)
+            if (!path) setHomePath(data.current) // the first load (no path) starts in the home folder
+          },
+          (e: unknown) => {
+            setError(e instanceof Error ? e.message : 'Failed to browse directory')
+          },
+        )
+        .finally(() => setLoading(false)),
+    [],
+  )
 
-  useEffect(() => {
+  // Used by the user's clicks and typing: resets the view, then fetches
+  const navigate = useCallback(
+    (path?: string) => {
+      setLoading(true)
+      setError('')
+      setCreatingFolder(false)
+      setNewFolderName('')
+      setNewFolderError('')
+      setNewFolderLoading(false)
+      return fetchDir(path)
+    },
+    [fetchDir],
+  )
+
+  // Each time the dialog opens, start clean
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
     if (open) {
       setBrowseData(null)
       setError('')
       setCreatingFolder(false)
-      navigate()
+      setLoading(true)
+      setNewFolderName('')
+      setNewFolderError('')
+      setNewFolderLoading(false)
     }
-  }, [open, navigate])
+  }
+
+  // Opening the dialog loads the folder list: an external fetch, started here
+  useEffect(() => {
+    if (open) void fetchDir()
+  }, [open, fetchDir])
 
   useEffect(() => {
     if (creatingFolder) {
@@ -168,7 +193,9 @@ export function AddProjectModal({ open, onClose }: Props) {
           <input
             value={pathInput}
             onChange={(e) => setPathInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && pathInput.trim()) void navigate(pathInput.trim()) }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && pathInput.trim()) void navigate(pathInput.trim())
+            }}
             placeholder="Type a folder path and press Enter"
             className="h-8 w-full rounded-lg bg-muted/60 px-3 font-mono text-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
           />
@@ -212,7 +239,10 @@ export function AddProjectModal({ open, onClose }: Props) {
                     <input
                       ref={newFolderRef}
                       value={newFolderName}
-                      onChange={(e) => { setNewFolderName(e.target.value); setNewFolderError('') }}
+                      onChange={(e) => {
+                        setNewFolderName(e.target.value)
+                        setNewFolderError('')
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleNewFolder()
                         if (e.key === 'Escape') cancelNewFolder()
@@ -222,9 +252,7 @@ export function AddProjectModal({ open, onClose }: Props) {
                       className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                       disabled={newFolderLoading}
                     />
-                    {newFolderError && (
-                      <p className="text-sm text-destructive mt-0.5">{newFolderError}</p>
-                    )}
+                    {newFolderError && <p className="text-sm text-destructive mt-0.5">{newFolderError}</p>}
                   </div>
                   {newFolderLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin text-foreground/70 shrink-0" strokeWidth={2} />

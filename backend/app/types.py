@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+
 from pydantic import BaseModel
 
 
@@ -19,16 +20,17 @@ MAX_IMAGES_PER_MESSAGE = 4  # keep in sync with frontend/src/lib/image.ts
 
 class ImageContent(BaseModel):
     media_type: str  # image/jpeg | image/png | image/gif | image/webp
-    data: str        # base64, no data: prefix
+    data: str  # base64, no data: prefix
 
 
 class MessageContent(BaseModel):
-    type: str        # "text" | "image"
+    type: str  # "text" | "image"
     text: str | None = None
     image: ImageContent | None = None
 
 
 # ── Conversation message ───────────────────────────────────────────────────────
+
 
 class Message(BaseModel):
     role: Role
@@ -47,4 +49,8 @@ def images_of(content: str | list[MessageContent]) -> list[ImageContent]:
     """Return the image parts of a message's content, in order."""
     if isinstance(content, str):
         return []
-    return [part.image for part in content if part.type == "image" and part.image is not None]
+    return [
+        part.image
+        for part in content
+        if part.type == "image" and part.image is not None
+    ]

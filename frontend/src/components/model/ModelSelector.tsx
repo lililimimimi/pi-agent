@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useChatStore } from '@/stores/chatStore'
-import { fetchModels, type ModelTestStatus } from '@/services/api'
+import { fetchModels } from '@/services/api/models'
 import { ChevronDown, Image as ImageIcon } from 'lucide-react'
+import type { ModelTestStatus } from '@/services/api/models'
 
 // The picker shows only the models enabled in Settings → Providers.
 
@@ -111,7 +112,9 @@ export function ModelSelector() {
           {providerLabel}
         </span>
         <span className="max-w-[160px] truncate text-sm font-medium text-foreground/80">{modelLabel}</span>
-        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`h-3.5 w-3.5 text-muted-foreground transition-transform shrink-0 ${open ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {open && (
@@ -127,7 +130,11 @@ export function ModelSelector() {
                 const dotTitle = m.status?.ok
                   ? `Works (${m.status.ms ?? '?'} ms)`
                   : m.status
-                    ? (/out of extra usage|quota|usage limit|rate limit|429|insufficient/i.test(m.status.error ?? '') ? 'Out of quota' : 'Last test failed')
+                    ? /out of extra usage|quota|usage limit|rate limit|429|insufficient/i.test(
+                        m.status.error ?? '',
+                      )
+                      ? 'Out of quota'
+                      : 'Last test failed'
                     : 'Not tested'
                 return (
                   <button
@@ -137,13 +144,19 @@ export function ModelSelector() {
                       setOpen(false)
                     }}
                     className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors ${
-                      isActive ? 'bg-accent font-medium text-foreground' : 'text-foreground/75 hover:bg-accent/60'
+                      isActive
+                        ? 'bg-accent font-medium text-foreground'
+                        : 'text-foreground/75 hover:bg-accent/60'
                     }`}
                   >
                     <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor}`} title={dotTitle} />
                     <span className="min-w-0 flex-1 truncate">{m.name}</span>
                     {m.supports_images && (
-                      <ImageIcon className="h-3 w-3 shrink-0 text-muted-foreground" strokeWidth={1.8} aria-label="Supports images" />
+                      <ImageIcon
+                        className="h-3 w-3 shrink-0 text-muted-foreground"
+                        strokeWidth={1.8}
+                        aria-label="Supports images"
+                      />
                     )}
                   </button>
                 )

@@ -1,12 +1,13 @@
 """Integration tests for /api/models/default endpoint and bridge proxy."""
+
 from __future__ import annotations
 
 import json
-import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
 
 @pytest.fixture
 async def client():
@@ -20,8 +21,10 @@ async def client():
 @pytest.mark.asyncio
 async def test_models_default_returns_mock_when_no_real_providers(client: AsyncClient):
     """When bridge is down and no config providers, returns built-in default."""
-    with patch("app.services.bridge.BRIDGE_URL", "http://127.0.0.1:19999"), \
-         patch("app.api.models.enabled_models", AsyncMock(return_value=[])):
+    with (
+        patch("app.services.bridge.BRIDGE_URL", "http://127.0.0.1:19999"),
+        patch("app.api.models.enabled_models", AsyncMock(return_value=[])),
+    ):
         r = await client.get("/api/models/default")
     assert r.status_code == 200
     body = r.json()
@@ -32,7 +35,14 @@ async def test_models_default_returns_mock_when_no_real_providers(client: AsyncC
 @pytest.mark.asyncio
 async def test_models_default_prefers_first_enabled_model(client: AsyncClient):
     """The default is the first model the user enabled in Settings."""
-    enabled = [{"id": "fake-v1", "name": "Fake V1", "provider": "fake-cloud", "supports_tools": True}]
+    enabled = [
+        {
+            "id": "fake-v1",
+            "name": "Fake V1",
+            "provider": "fake-cloud",
+            "supports_tools": True,
+        }
+    ]
     with patch("app.api.models.enabled_models", AsyncMock(return_value=enabled)):
         r = await client.get("/api/models/default")
     assert r.status_code == 200
@@ -42,6 +52,7 @@ async def test_models_default_prefers_first_enabled_model(client: AsyncClient):
 # --------------------------------------------------------------------------- #
 # Helper
 # --------------------------------------------------------------------------- #
+
 
 def _parse_sse_lines(raw: str) -> list[dict]:
     events = []
@@ -56,8 +67,10 @@ def _parse_sse_lines(raw: str) -> list[dict]:
 # Tool execution + security integration tests
 # --------------------------------------------------------------------------- #
 
+
 def _make_mock_bridge(fake_lines: list[str]):
     """Create a mock httpx.AsyncClient that returns fake SSE lines from bridge."""
+
     async def _fake_aiter_lines():
         for line in fake_lines:
             yield line
@@ -96,7 +109,7 @@ async def test_tool_execution_flow(client: AsyncClient):
     ]
     mock_client = _make_mock_bridge(fake_lines)
 
-    with patch("app.api.chat.httpx.AsyncClient", return_value=mock_client):
+    with patch("app.services.chat_stream.httpx.AsyncClient", return_value=mock_client):
         stream_r = await client.get(f"/api/chat/stream/{session_id}")
 
     events = _parse_sse_lines(stream_r.text)
@@ -129,7 +142,7 @@ async def test_permission_request_proxied(client: AsyncClient):
     ]
     mock_client = _make_mock_bridge(fake_lines)
 
-    with patch("app.api.chat.httpx.AsyncClient", return_value=mock_client):
+    with patch("app.services.chat_stream.httpx.AsyncClient", return_value=mock_client):
         stream_r = await client.get(f"/api/chat/stream/{session_id}")
 
     events = _parse_sse_lines(stream_r.text)

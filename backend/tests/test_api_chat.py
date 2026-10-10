@@ -4,6 +4,7 @@ Integration tests for the FastAPI HTTP layer.
 Uses httpx AsyncClient + ASGITransport — no real server required.
 Stream tests mock the pi-bridge proxy to avoid needing a running bridge.
 """
+
 from __future__ import annotations
 
 import json
@@ -12,14 +13,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-
 # --------------------------------------------------------------------------- #
 # Fixtures
 # --------------------------------------------------------------------------- #
 
+
 @pytest.fixture
 async def client():
     from app.main import app
+
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as c:
@@ -29,6 +31,7 @@ async def client():
 # --------------------------------------------------------------------------- #
 # Helper
 # --------------------------------------------------------------------------- #
+
 
 def _parse_sse_lines(raw: str) -> list[dict]:
     events = []
@@ -42,6 +45,7 @@ def _parse_sse_lines(raw: str) -> list[dict]:
 # --------------------------------------------------------------------------- #
 # Tests
 # --------------------------------------------------------------------------- #
+
 
 async def test_health(client: AsyncClient):
     r = await client.get("/api/health")
@@ -98,7 +102,9 @@ async def test_stream_returns_text_and_done(client: AsyncClient):
     mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
     mock_client_instance.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("app.api.chat.httpx.AsyncClient", return_value=mock_client_instance):
+    with patch(
+        "app.services.chat_stream.httpx.AsyncClient", return_value=mock_client_instance
+    ):
         stream_r = await client.get(f"/api/chat/stream/{session_id}")
 
     assert stream_r.status_code == 200
@@ -144,7 +150,9 @@ async def test_stream_text_content_matches_proxy(client: AsyncClient):
     mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
     mock_client_instance.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("app.api.chat.httpx.AsyncClient", return_value=mock_client_instance):
+    with patch(
+        "app.services.chat_stream.httpx.AsyncClient", return_value=mock_client_instance
+    ):
         stream_r = await client.get(f"/api/chat/stream/{session_id}")
 
     events = _parse_sse_lines(stream_r.text)
@@ -227,7 +235,9 @@ async def test_stream_bridge_error_is_proxied(client: AsyncClient):
     mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
     mock_client_instance.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("app.api.chat.httpx.AsyncClient", return_value=mock_client_instance):
+    with patch(
+        "app.services.chat_stream.httpx.AsyncClient", return_value=mock_client_instance
+    ):
         stream_r = await client.get(f"/api/chat/stream/{session_id}")
 
     assert stream_r.status_code == 200

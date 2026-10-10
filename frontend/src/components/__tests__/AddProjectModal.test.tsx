@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
-vi.mock('@/services/api', () => ({
+vi.mock('@/services/api/projects', () => ({
   browseDirs: vi.fn(),
   mkdirApi: vi.fn(),
 }))
 
-import { browseDirs, mkdirApi } from '@/services/api'
+import { browseDirs, mkdirApi } from '@/services/api/projects'
 import { AddProjectModal } from '../sidebar/AddProjectModal'
 
 const HOME = { current: '/Users/me', parent: '/Users', dirs: [] }

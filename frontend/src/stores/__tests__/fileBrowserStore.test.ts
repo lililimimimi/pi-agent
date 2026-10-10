@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/services/api', () => ({
+vi.mock('@/services/api/files', () => ({
   fetchFileTree: vi.fn(),
   fetchFileContent: vi.fn(),
 }))
 
-import { fetchFileTree, fetchFileContent } from '@/services/api'
+import { fetchFileTree, fetchFileContent } from '@/services/api/files'
 import { useFileBrowserStore, clampPreviewWidth, PREVIEW_MIN_WIDTH } from '../fileBrowserStore'
 
 const treeOf = (children: unknown[]) => ({ name: 'root', type: 'dir', path: '', children })

@@ -3,7 +3,7 @@ import { useChatStore } from '@/stores/chatStore'
 import { useFileBrowserStore } from '@/stores/fileBrowserStore'
 import { FileTreeNode } from '@/components/files/FileTreeNode'
 import { FolderPlus, Search } from 'lucide-react'
-import type { FileNode } from '@/services/api'
+import type { FileNode } from '@/services/api/files'
 
 // Files that are already loaded in the tree, matched by name
 function searchLoaded(childrenByDir: Record<string, FileNode[]>, query: string): FileNode[] {
@@ -63,17 +63,13 @@ export function FileBrowser() {
       {/* Tree / search results */}
       <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
         {!rootPath && (
-          <p className="px-2 py-2 text-sm text-muted-foreground italic">
-            No project folder selected
-          </p>
+          <p className="px-2 py-2 text-sm text-muted-foreground italic">No project folder selected</p>
         )}
 
         {rootPath && query.trim() && (
           <>
             {matches.length === 0 && (
-              <p className="px-2 py-2 text-sm text-muted-foreground italic">
-                No matches in loaded folders
-              </p>
+              <p className="px-2 py-2 text-sm text-muted-foreground italic">No matches in loaded folders</p>
             )}
             {matches.map((n) => (
               <button
@@ -89,15 +85,16 @@ export function FileBrowser() {
           </>
         )}
 
-        {rootPath && !query.trim() && rootChildren && (
-          rootChildren.length === 0
-            ? <p className="px-2 py-2 text-sm text-muted-foreground italic">Empty folder</p>
-            : rootChildren.map((node) => <FileTreeNode key={node.path} node={node} depth={0} />)
-        )}
+        {rootPath &&
+          !query.trim() &&
+          rootChildren &&
+          (rootChildren.length === 0 ? (
+            <p className="px-2 py-2 text-sm text-muted-foreground italic">Empty folder</p>
+          ) : (
+            rootChildren.map((node) => <FileTreeNode key={node.path} node={node} depth={0} />)
+          ))}
 
-        {error && (
-          <p className="px-2 py-2 text-sm text-destructive break-words">{error}</p>
-        )}
+        {error && <p className="px-2 py-2 text-sm text-destructive break-words">{error}</p>}
       </div>
 
       {/* Root folder picker */}
@@ -109,9 +106,15 @@ export function FileBrowser() {
             onChange={(e) => setPathInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') submitRoot()
-              if (e.key === 'Escape') { setChoosing(false); setPathInput('') }
+              if (e.key === 'Escape') {
+                setChoosing(false)
+                setPathInput('')
+              }
             }}
-            onBlur={() => { setChoosing(false); setPathInput('') }}
+            onBlur={() => {
+              setChoosing(false)
+              setPathInput('')
+            }}
             placeholder="/absolute/path/to/project"
             className="w-full rounded-lg bg-white/60 px-2.5 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
           />

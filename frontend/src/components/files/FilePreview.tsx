@@ -31,10 +31,7 @@ export function FilePreview() {
   }
 
   return (
-    <aside
-      style={{ width }}
-      className="relative shrink-0 flex flex-col border-l border-border/50 bg-card"
-    >
+    <aside style={{ width }} className="relative shrink-0 flex flex-col border-l border-border/50 bg-card">
       <div
         onPointerDown={handlePointerDown}
         role="separator"

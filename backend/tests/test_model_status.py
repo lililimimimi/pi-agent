@@ -1,4 +1,5 @@
 """Tests for which chat errors mark a model as failed in the model picker."""
+
 from __future__ import annotations
 
 import pytest
@@ -59,7 +60,9 @@ def cfg_file(tmp_path: Path, monkeypatch) -> Path:
 
 async def _run_turn(lines: list[str]) -> None:
     """Start a chat and stream the given bridge lines, with the bridge mocked."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         r = await client.post(
             "/api/chat",
             json={
@@ -86,7 +89,7 @@ async def _run_turn(lines: list[str]) -> None:
         bridge.stream = MagicMock(return_value=stream_ctx)
         bridge.__aenter__ = AsyncMock(return_value=bridge)
         bridge.__aexit__ = AsyncMock(return_value=False)
-        with patch("app.api.chat.httpx.AsyncClient", return_value=bridge):
+        with patch("app.services.chat_stream.httpx.AsyncClient", return_value=bridge):
             await client.get(f"/api/chat/stream/{session_id}")
 
 
@@ -96,24 +99,30 @@ def _status(cfg_file: Path) -> dict | None:
 
 
 async def test_chat_turn_marks_model_failed_for_a_lasting_error(cfg_file):
-    await _run_turn([
-        'data: {"event": "error", "data": {"message": "This model is not available with your ChatGPT subscription."}}',
-        'data: {"event": "done", "data": {}}',
-    ])
+    await _run_turn(
+        [
+            'data: {"event": "error", "data": {"message": "This model is not available with your ChatGPT subscription."}}',
+            'data: {"event": "done", "data": {}}',
+        ]
+    )
     assert _status(cfg_file)["ok"] is False
 
 
 async def test_chat_turn_leaves_status_alone_for_a_temporary_error(cfg_file):
-    await _run_turn([
-        'data: {"event": "error", "data": {"message": "Request timed out"}}',
-        'data: {"event": "done", "data": {}}',
-    ])
+    await _run_turn(
+        [
+            'data: {"event": "error", "data": {"message": "Request timed out"}}',
+            'data: {"event": "done", "data": {}}',
+        ]
+    )
     assert _status(cfg_file) is None
 
 
 async def test_chat_reply_marks_model_working(cfg_file):
-    await _run_turn([
-        'data: {"event": "text", "data": {"content": "hello"}}',
-        'data: {"event": "done", "data": {}}',
-    ])
+    await _run_turn(
+        [
+            'data: {"event": "text", "data": {"content": "hello"}}',
+            'data: {"event": "done", "data": {}}',
+        ]
+    )
     assert _status(cfg_file)["ok"] is True

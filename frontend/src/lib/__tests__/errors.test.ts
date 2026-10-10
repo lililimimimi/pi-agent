@@ -24,4 +24,13 @@ describe('friendlyError', () => {
   it('shortens very long details', () => {
     expect(friendlyError('x'.repeat(500)).detail.length).toBeLessThan(310)
   })
+
+  it('a missing session is not reported as a missing model', () => {
+    expect(friendlyError("Session 'abc' not found").title).toBe('Something went wrong.')
+  })
+
+  it('a Pi-format chat that cannot be edited gets its own title', () => {
+    const e = friendlyError("This chat is saved in Pi's own format, so it cannot be edited here.")
+    expect(e.title).toBe("This chat can't be edited here. Start a new chat to change it.")
+  })
 })

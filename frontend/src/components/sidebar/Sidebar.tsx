@@ -1,295 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useChatStore } from '@/stores/chatStore'
 import { AddProjectModal } from '@/components/sidebar/AddProjectModal'
 import { FileBrowser } from '@/components/files/FileBrowser'
 import { useFileBrowserStore } from '@/stores/fileBrowserStore'
 import { useLayoutStore, clampSidebarWidth } from '@/stores/layoutStore'
-import {
-  Plus, Settings, MessageSquare, Folder, FolderOpen,
-  MoreHorizontal, Pencil, Trash2, Check, FolderPlus, Search, FolderOpen as RevealIcon,
-} from 'lucide-react'
-import { revealSessionFile, revealProjectFolder, renameProjectApi } from '@/services/api'
-import { useToast } from '@/components/Toast'
-import { DeleteProjectDialog } from '@/components/sidebar/DeleteProjectDialog'
+import { Plus, Settings, Check, FolderPlus, Search } from 'lucide-react'
+import {} from '@/services/api/sessions'
+import {} from '@/services/api/projects'
+import {} from '@/components/useToast'
+import { SessionRow } from '@/components/sidebar/SessionRow'
+import { ProjectRow } from '@/components/sidebar/ProjectRow'
+import {} from '@/components/sidebar/DeleteProjectDialog'
 import { isHiddenAutoProject } from '@/lib/projects'
 
 type SidebarProps = {
   onSettingsClick?: () => void
 }
 
-// ── Inline rename input ───────────────────────────────────────────────────────
-function RenameInput({
-  value,
-  onCommit,
-  onCancel,
-}: {
-  value: string
-  onCommit: (v: string) => void
-  onCancel: () => void
-}) {
-  const [text, setText] = useState(value)
-  const ref = useRef<HTMLInputElement>(null)
-
-  useEffect(() => { ref.current?.focus(); ref.current?.select() }, [])
-
-  return (
-    <input
-      ref={ref}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onCommit(text.trim() || value)
-        if (e.key === 'Escape') onCancel()
-        e.stopPropagation()
-      }}
-      onBlur={() => onCommit(text.trim() || value)}
-      className="flex-1 min-w-0 bg-transparent text-sm outline-none border-b border-foreground/30 leading-snug"
-    />
-  )
-}
-
-// ── Session row ───────────────────────────────────────────────────────────────
-function SessionRow({
-  session,
-  isActive,
-  editMode,
-  selected,
-  onToggle,
-}: {
-  session: { id: string; title: string; persistId?: string | null }
-  isActive: boolean
-  editMode: boolean
-  selected: boolean
-  onToggle: () => void
-}) {
-  const switchSession = useChatStore((s) => s.switchSession)
-  const renameSession = useChatStore((s) => s.renameSession)
-  const deleteSession = useChatStore((s) => s.deleteSession)
-  const { showToast } = useToast()
-
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [renaming, setRenaming] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!menuOpen) return
-    const handler = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('pointerdown', handler)
-    return () => document.removeEventListener('pointerdown', handler)
-  }, [menuOpen])
-
-  if (editMode) {
-    return (
-      <div
-        className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm cursor-pointer transition-colors ${
-          selected ? 'bg-destructive/10' : 'hover:bg-black/[0.06]'
-        }`}
-        onClick={onToggle}
-      >
-        {/* Checkbox */}
-        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-          selected ? 'bg-destructive border-destructive' : 'border-foreground/30'
-        }`}>
-          {selected && <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />}
-        </div>
-        <span className={`truncate flex-1 leading-snug ${selected ? 'text-destructive' : 'text-foreground/60'}`}>
-          {session.title}
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className={`group/row relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm cursor-pointer transition-colors ${
-        isActive ? 'bg-white shadow-sm text-foreground font-medium' : 'text-foreground/60 hover:bg-black/[0.06]'
-      }`}
-      onClick={() => { if (!renaming) switchSession(session.id) }}
-    >
-      <MessageSquare
-        className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-foreground/70' : 'text-muted-foreground'}`}
-        strokeWidth={1.8}
-      />
-
-      {renaming ? (
-        <RenameInput
-          value={session.title}
-          onCommit={(v) => { renameSession(session.id, v); setRenaming(false) }}
-          onCancel={() => setRenaming(false)}
-        />
-      ) : (
-        <span className="truncate flex-1 leading-snug">{session.title}</span>
-      )}
-
-      {!renaming && (
-        <button
-          className="shrink-0 opacity-0 group-hover/row:opacity-100 w-5 h-5 flex items-center justify-center rounded-md hover:bg-foreground/10 transition-all"
-          onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v) }}
-        >
-          <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
-        </button>
-      )}
-
-      {menuOpen && (
-        <div
-          ref={menuRef}
-          className="absolute right-2 top-8 z-50 min-w-[140px] rounded-xl border border-border/60 bg-card shadow-lg p-1 text-sm"
-        >
-          <button
-            className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-accent transition-colors text-foreground/80"
-            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setRenaming(true) }}
-          >
-            <Pencil className="h-3.5 w-3.5" strokeWidth={1.8} />
-            Rename
-          </button>
-          {session.persistId && (
-            <button
-              className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-accent transition-colors text-foreground/80"
-              onClick={(e) => {
-                e.stopPropagation()
-                setMenuOpen(false)
-                revealSessionFile(session.persistId!).catch((err: Error) =>
-                  showToast({ type: 'error', message: err.message }),
-                )
-              }}
-            >
-              <RevealIcon className="h-3.5 w-3.5" strokeWidth={1.8} />
-              Show in Finder
-            </button>
-          )}
-          <button
-            className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-destructive/10 text-destructive transition-colors"
-            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); deleteSession(session.id) }}
-          >
-            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} />
-            Delete
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Project row ───────────────────────────────────────────────────────────────
-function ProjectRow({ project, isActive }: { project: { id: string; name: string; path?: string }; isActive: boolean }) {
-  const switchProject = useChatStore((s) => s.switchProject)
-  const renameProject = useChatStore((s) => s.renameProject)
-  // Renames the folder on disk too; the list only changes once the backend has done it
-  const handleRename = (name: string) => {
-    setRenaming(false)
-    const next = name.trim()
-    if (!next || next === project.name) return
-    renameProjectApi(project.id, next)
-      .then((saved) => renameProject(project.id, saved.name, saved.path))
-      .catch((err: Error) => showToast({ type: 'error', message: err.message }))
-  }
-  const deleteProject = useChatStore((s) => s.deleteProject)
-  const { showToast } = useToast()
-  const sessionCountFor = (id: string) => useChatStore.getState().sessions.filter((x) => x.projectId === id).length
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const projects = useChatStore((s) => s.projects)
-
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [renaming, setRenaming] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!menuOpen) return
-    const handler = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('pointerdown', handler)
-    return () => document.removeEventListener('pointerdown', handler)
-  }, [menuOpen])
-
-  const Icon = isActive ? FolderOpen : Folder
-
-  return (
-    <>
-    <div
-      className={`group/proj relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm cursor-pointer transition-colors ${
-        isActive ? 'bg-white shadow-sm text-foreground font-medium' : 'text-foreground/60 hover:bg-black/[0.06]'
-      }`}
-      onClick={() => { if (!renaming) switchProject(project.id) }}
-    >
-      <Icon
-        className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-foreground/70' : 'text-muted-foreground'}`}
-        strokeWidth={1.8}
-      />
-
-      {renaming ? (
-        <RenameInput
-          value={project.name}
-          onCommit={handleRename}
-          onCancel={() => setRenaming(false)}
-        />
-      ) : (
-        <span className="truncate flex-1 leading-snug">{project.name}</span>
-      )}
-
-      {!renaming && (
-        <button
-          className="shrink-0 opacity-0 group-hover/proj:opacity-100 w-5 h-5 flex items-center justify-center rounded-md hover:bg-foreground/10 transition-all"
-          onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v) }}
-        >
-          <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
-        </button>
-      )}
-
-      {menuOpen && (
-        <div
-          ref={menuRef}
-          className="absolute right-2 top-8 z-50 min-w-[140px] rounded-xl border border-border/60 bg-card shadow-lg p-1 text-sm"
-        >
-          <button
-            className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-accent transition-colors text-foreground/80"
-            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setRenaming(true) }}
-          >
-            <Pencil className="h-3.5 w-3.5" strokeWidth={1.8} />
-            Rename
-          </button>
-          <button
-            className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-accent transition-colors text-foreground/80"
-            onClick={(e) => {
-              e.stopPropagation()
-              setMenuOpen(false)
-              revealProjectFolder(project.id).catch((err: Error) => showToast({ type: 'error', message: err.message }))
-            }}
-          >
-            <RevealIcon className="h-3.5 w-3.5" strokeWidth={1.8} />
-            Show in Finder
-          </button>
-          {projects.length > 1 && (
-            <button
-              className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-destructive/10 text-destructive transition-colors"
-              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setConfirmingDelete(true) }}
-            >
-              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} />
-              Delete
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-    {confirmingDelete && (
-      <DeleteProjectDialog
-        projectName={project.name}
-        folderPath={project.path ?? ''}
-        sessionCount={sessionCountFor(project.id)}
-        onCancel={() => setConfirmingDelete(false)}
-        onConfirm={(deleteFolder) => {
-          setConfirmingDelete(false)
-          deleteProject(project.id, deleteFolder)
-        }}
-      />
-    )}
-    </>
-  )
-}
-
-// ── Main sidebar ──────────────────────────────────────────────────────────────
 export function Sidebar({ onSettingsClick }: SidebarProps) {
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
   const setSidebarWidth = useLayoutStore((s) => s.setSidebarWidth)
@@ -327,16 +54,24 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   // Exit edit mode when project switches
-  useEffect(() => {
+  const [editProjectId, setEditProjectId] = useState(activeProjectId)
+  if (editProjectId !== activeProjectId) {
+    setEditProjectId(activeProjectId)
     setEditMode(false)
     setSelected(new Set())
-  }, [activeProjectId])
+  }
 
   // ⌘N shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); newSession() }
-      if (e.key === 'Escape' && editMode) { setEditMode(false); setSelected(new Set()) }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        e.preventDefault()
+        newSession()
+      }
+      if (e.key === 'Escape' && editMode) {
+        setEditMode(false)
+        setSelected(new Set())
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -351,16 +86,15 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }
 
   const selectAll = () => {
     const allIds = projectSessions.map((s) => s.id)
-    setSelected((prev) =>
-      prev.size === allIds.length ? new Set() : new Set(allIds)
-    )
+    setSelected((prev) => (prev.size === allIds.length ? new Set() : new Set(allIds)))
   }
 
   const confirmBulkDelete = () => {
@@ -406,7 +140,9 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
               key={v}
               onClick={() => setSidebarView(v)}
               className={`flex-1 rounded-md py-1 transition-colors ${
-                sidebarView === v ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                sidebarView === v
+                  ? 'bg-white shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {v === 'sessions' ? 'Sessions' : 'Files'}
@@ -418,11 +154,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
       {sidebarView === 'files' && <FileBrowser />}
 
       {/* Scrollable body */}
-      <div
-        hidden={sidebarView === 'files'}
-        className="flex-1 overflow-y-auto px-3 py-3 space-y-4"
-      >
-
+      <div hidden={sidebarView === 'files'} className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
         {/* Global search — above projects */}
         <div className="px-1">
           <div className="flex items-center gap-1.5 rounded-lg bg-white/60 px-2.5 py-1.5">
@@ -469,8 +201,10 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
             {projectSessions.length > 0 && (
               <button
                 onClick={() => {
-                  if (editMode) { setEditMode(false); setSelected(new Set()) }
-                  else setEditMode(true)
+                  if (editMode) {
+                    setEditMode(false)
+                    setSelected(new Set())
+                  } else setEditMode(true)
                 }}
                 className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
@@ -486,11 +220,13 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
                 onClick={selectAll}
                 className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm text-foreground/70 hover:bg-black/[0.04] transition-colors"
               >
-                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                  selected.size === projectSessions.length && projectSessions.length > 0
-                    ? 'bg-foreground/40 border-foreground/40'
-                    : 'border-foreground/20'
-                }`}>
+                <div
+                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                    selected.size === projectSessions.length && projectSessions.length > 0
+                      ? 'bg-foreground/40 border-foreground/40'
+                      : 'border-foreground/20'
+                  }`}
+                >
                   {selected.size === projectSessions.length && projectSessions.length > 0 && (
                     <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
                   )}

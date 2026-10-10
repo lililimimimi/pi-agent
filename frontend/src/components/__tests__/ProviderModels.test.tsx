@@ -1,19 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
-vi.mock('@/services/api', () => ({
+vi.mock('@/services/api/models', () => ({
   setEnabledModels: vi.fn(async () => {}),
   testModel: vi.fn(async () => ({ ok: true, ms: 300 })),
 }))
 
-import { setEnabledModels, testModel } from '@/services/api'
+import { setEnabledModels, testModel } from '@/services/api/models'
 import { ProviderModels } from '@/components/settings/ProviderModels'
 
 const GROUP = {
   provider: 'deepseek',
   label: 'DeepSeek',
   models: [
-    { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', supports_images: false, enabled: true, status: null },
+    {
+      id: 'deepseek-v4-flash',
+      name: 'DeepSeek V4 Flash',
+      supports_images: false,
+      enabled: true,
+      status: null,
+    },
     { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', supports_images: false, enabled: false, status: null },
   ],
 }
@@ -41,7 +47,9 @@ describe('ProviderModels', () => {
 
     fireEvent.click(screen.getByRole('switch', { name: 'Enable DeepSeek V4 Pro' }))
 
-    await waitFor(() => expect(setEnabledModels).toHaveBeenCalledWith('deepseek', ['deepseek-v4-flash', 'deepseek-v4-pro']))
+    await waitFor(() =>
+      expect(setEnabledModels).toHaveBeenCalledWith('deepseek', ['deepseek-v4-flash', 'deepseek-v4-pro']),
+    )
     expect(onChanged).toHaveBeenCalled()
   })
 
@@ -76,14 +84,23 @@ describe('ProviderModels', () => {
   })
 
   it('cannot be opened, and shows the hint, when the provider has no key', () => {
-    render(<ProviderModels group={GROUP} configured={false} unconfiguredHint="Set an API key to enable these models." onChanged={vi.fn()} />)
+    render(
+      <ProviderModels
+        group={GROUP}
+        configured={false}
+        unconfiguredHint="Set an API key to enable these models."
+        onChanged={vi.fn()}
+      />,
+    )
     expect(screen.getByText('Set an API key to enable these models.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /of 2 enabled/ }))
     expect(screen.queryByRole('switch')).toBeNull()
   })
 
   it('says so when a provider has no models', () => {
-    render(<ProviderModels group={{ ...GROUP, models: [] }} configured unconfiguredHint="" onChanged={vi.fn()} />)
+    render(
+      <ProviderModels group={{ ...GROUP, models: [] }} configured unconfiguredHint="" onChanged={vi.fn()} />,
+    )
     expect(screen.getByText('No models found.')).toBeTruthy()
   })
 })

@@ -1,34 +1,33 @@
-import express from "express";
-import { homedir } from "node:os";
+import express from 'express'
+import { homedir } from 'node:os'
 import {
   createAgentSession,
   DefaultResourceLoader,
   getAgentDir,
   ModelRuntime,
   SessionManager,
-} from "@earendil-works/pi-coding-agent";
-import type { AgentSession, AgentSessionEvent, ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { buildPreview, isProjectEdit, isWriteTool } from "../preview.js";
-import { toPromptInput } from "../content.js";
-import { resolveSessionCwd } from "../cwd.js";
-import { pickModelForImages, supportsImages } from "../vision.js";
-import { getModelRuntime, MODEL_ALIASES, PROVIDER_ALIAS, PROVIDER_DEFAULT_MODEL } from "../runtime.js";
-import { previewRegistry, sessions } from "../state.js";
+} from '@earendil-works/pi-coding-agent'
+import type { AgentSession, AgentSessionEvent, ExtensionAPI } from '@earendil-works/pi-coding-agent'
+import { buildPreview, needsPreview } from '../preview.js'
+import { toPromptInput } from '../content.js'
+import { resolveSessionCwd } from '../cwd.js'
+import { pickModelForImages, supportsImages } from '../vision.js'
+import { getModelRuntime, MODEL_ALIASES, PROVIDER_ALIAS, PROVIDER_DEFAULT_MODEL } from '../runtime.js'
+import { previewRegistry, sessions } from '../state.js'
 
-const HOME_DIR = homedir();
+const HOME_DIR = homedir()
 
-const router = express.Router();
+const router = express.Router()
 
 type PreviewController = {
-  enabled: boolean;
+  enabled: boolean
   /** When on, file edits and new files inside `cwd` run without asking */
-  autoEdits: boolean;
-  cwd: string;
-  confirmed: boolean;
-  cancelled: boolean;
-  assistantText: string;
-  send: (event: string, data: Record<string, unknown>) => void;
-};
+  autoEdits: boolean
+  cwd: string
+  cancelled: boolean
+  assistantText: string
+  send: (event: string, data: Record<string, unknown>) => void
+}
 
 /**
  * Inline extension that pauses the agent before its first write tool call and
@@ -37,121 +36,120 @@ type PreviewController = {
  */
 function makePreviewExtension(ctrl: PreviewController) {
   return (pi: ExtensionAPI) => {
-    pi.on("tool_call", async (event) => {
-      if (!ctrl.enabled || ctrl.confirmed || ctrl.cancelled) return;
-      // Auto-approved: a file edit inside the project. Shell commands and outside paths still ask.
-      if (ctrl.autoEdits && isProjectEdit(event.toolName, event.input as Record<string, unknown>, ctrl.cwd)) return;
-      if (!isWriteTool(event.toolName, event.input as Record<string, unknown>)) return;
+    pi.on('tool_call', async (event) => {
+      const args = event.input as Record<string, unknown>
+      // Every write asks, including the second and third in the same turn
+      if (!needsPreview(ctrl, event.toolName, args)) return
 
-      const previewId = crypto.randomUUID();
+      const previewId = crypto.randomUUID()
       const steps = buildPreview({
         assistantText: ctrl.assistantText,
         toolName: event.toolName,
-        args: event.input as Record<string, unknown>,
-      });
-      ctrl.send("execution_preview", { preview_id: previewId, steps, has_write_ops: true });
+        args,
+      })
+      ctrl.send('execution_preview', { preview_id: previewId, steps, has_write_ops: true })
 
-      const decision = await previewRegistry.wait(previewId, {
-        onTimeout: () => {
-          ctrl.send("text", { content: "\n\n> ⏱ Execution preview timed out and was cancelled.\n" });
-        },
-      });
+      const decision = await previewRegistry.wait(previewId)
+      if (decision === 'confirm') return
 
-      if (decision === "confirm") {
-        ctrl.confirmed = true;
-        return;
-      }
-
-      ctrl.cancelled = true;
-      if (decision === "cancel") {
-        ctrl.send("text", { content: "\n\n> ⏹ Execution cancelled.\n" });
-      }
-      return { block: true, reason: "Execution cancelled at preview", terminate: true };
-    });
-  };
+      ctrl.cancelled = true
+      ctrl.send('text', { content: '\n\n> ⏹ Execution cancelled.\n' })
+      return { block: true, reason: 'Execution cancelled at preview', terminate: true }
+    })
+  }
 }
 
-export const app = express();
+export const app = express()
 // Images are sent inline as base64, so a single message can be several MB
-router.use(express.json({ limit: "20mb" }));
+router.use(express.json({ limit: '20mb' }))
 
-router.post("/chat", async (req, res) => {
+router.post('/chat', async (req, res) => {
   // Correlation ID from the backend, so bridge logs join the same chain
-  const cid: string = typeof req.body?.cid === "string" ? req.body.cid : "-";
-  console.log(`[bridge] cid=${cid} POST /chat model=${req.body?.model} provider=${req.body?.provider}`);
-  const { messages, model: rawModel, rules } = req.body as { messages: unknown; model: string; rules?: string; cwd?: string };
+  const cid: string = typeof req.body?.cid === 'string' ? req.body.cid : '-'
+  console.log(`[bridge] cid=${cid} POST /chat model=${req.body?.model} provider=${req.body?.provider}`)
+  const {
+    messages,
+    model: rawModel,
+    rules,
+  } = req.body as { messages: unknown; model: string; rules?: string; cwd?: string }
   // The selected project folder: tools and rules are scoped to it
-  const sessionCwd = resolveSessionCwd(req.body.cwd, HOME_DIR);
+  const sessionCwd = resolveSessionCwd(req.body.cwd, HOME_DIR)
   // Resolve provider alias (e.g. "pi" → "anthropic")
-  const rawProvider: string = req.body.provider ?? "anthropic";
-  const provider = PROVIDER_ALIAS[rawProvider] ?? rawProvider;
+  const rawProvider: string = req.body.provider ?? 'anthropic'
+  const provider = PROVIDER_ALIAS[rawProvider] ?? rawProvider
 
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders();
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders()
 
   function send(event: string, data: Record<string, unknown>) {
-    res.write(`data: ${JSON.stringify({ event, data })}\n\n`);
+    res.write(`data: ${JSON.stringify({ event, data })}\n\n`)
   }
 
   const previewCtrl: PreviewController = {
     enabled: req.body.execution_preview !== false,
     autoEdits: req.body.auto_edits === true,
     cwd: sessionCwd,
-    confirmed: false,
     cancelled: false,
-    assistantText: "",
+    assistantText: '',
     send,
-  };
+  }
 
-  let runtime: ModelRuntime;
+  let runtime: ModelRuntime
   try {
-    console.log(`[bridge] getModelRuntime provider=${provider}`);
-    runtime = await getModelRuntime(provider);
-    console.log(`[bridge] runtime ready`);
+    console.log(`[bridge] getModelRuntime provider=${provider}`)
+    runtime = await getModelRuntime(provider)
+    console.log(`[bridge] runtime ready`)
   } catch (err: unknown) {
-    send("error", { message: err instanceof Error ? err.message : "Failed to init runtime" });
-    send("done", {});
-    res.end();
-    return;
+    send('error', { message: err instanceof Error ? err.message : 'Failed to init runtime' })
+    send('done', {})
+    res.end()
+    return
   }
 
   // Resolve model: alias first, then look up in runtime, then fallback to provider default
-  const modelId = MODEL_ALIASES[rawModel] ?? rawModel;
-  let model = runtime.getModel(provider, modelId);
+  const modelId = MODEL_ALIASES[rawModel] ?? rawModel
+  let model = runtime.getModel(provider, modelId)
   if (!model) {
     // Try to find any working model for this provider
-    const fallbackId = PROVIDER_DEFAULT_MODEL[provider] ?? PROVIDER_DEFAULT_MODEL[rawProvider];
+    const fallbackId = PROVIDER_DEFAULT_MODEL[provider] ?? PROVIDER_DEFAULT_MODEL[rawProvider]
     if (fallbackId) {
-      model = runtime.getModel(provider, fallbackId);
-      console.log(`[bridge] model ${modelId} not found, fallback to ${fallbackId} found=${!!model}`);
+      model = runtime.getModel(provider, fallbackId)
+      console.log(`[bridge] model ${modelId} not found, fallback to ${fallbackId} found=${!!model}`)
     }
   } else {
-    console.log(`[bridge] model resolved: ${provider}/${modelId} found=${!!model}`);
+    console.log(`[bridge] model resolved: ${provider}/${modelId} found=${!!model}`)
   }
 
   // Images are only sent to models that accept them. For other models, switch to
   // a vision model from the same provider if one exists, otherwise drop the images.
-  let imagesDropped = false;
-  const lastUser = (messages as Array<{ role: string; content: unknown }>).filter(m => m.role === "user").at(-1);
-  const wantsImages = toPromptInput(lastUser?.content).images.length > 0;
+  let imagesDropped = false
+  const lastUser = (messages as Array<{ role: string; content: unknown }>)
+    .filter((m) => m.role === 'user')
+    .at(-1)
+  const wantsImages = toPromptInput(lastUser?.content).images.length > 0
   if (model && wantsImages && !supportsImages(model)) {
-    const choice = pickModelForImages(model, await runtime.getAvailable());
-    if (choice.kind === "switch") {
-      send("text", { content: `> The current model cannot read images. Switched to ${choice.model.name} for this message.\n\n` });
-      model = choice.model;
+    const choice = pickModelForImages(model, await runtime.getAvailable())
+    if (choice.kind === 'switch') {
+      send('text', {
+        content: `> The current model cannot read images. Switched to ${choice.model.name} for this message.\n\n`,
+      })
+      model = choice.model
     } else {
-      imagesDropped = true;
-      send("text", { content: "> The current model cannot read images, so they were ignored. Pick a model that supports images.\n\n" });
+      imagesDropped = true
+      send('text', {
+        content:
+          '> The current model cannot read images, so they were ignored. Pick a model that supports images.\n\n',
+      })
     }
   }
 
-  let session: AgentSession;
+  let session: AgentSession
   try {
-    console.log(`[bridge] createAgentSession...`);
-    let resourceLoader: DefaultResourceLoader | undefined;
+    console.log(`[bridge] createAgentSession...`)
+    let resourceLoader: DefaultResourceLoader | undefined
     // The loader carries the execution-preview extension and the project rules
     if (previewCtrl.enabled || rules) {
       resourceLoader = new DefaultResourceLoader({
@@ -160,110 +158,116 @@ router.post("/chat", async (req, res) => {
         extensionFactories: previewCtrl.enabled ? [makePreviewExtension(previewCtrl)] : [],
         // Project and global rules, injected into the system prompt
         appendSystemPrompt: rules ? [rules] : undefined,
-      });
-      await resourceLoader.reload();
+      })
+      await resourceLoader.reload()
     }
     const result = await createAgentSession({
       cwd: sessionCwd,
       sessionManager: SessionManager.inMemory(),
       modelRuntime: runtime,
       // Image questions are answered directly; tools would only add a detour and an approval wait
-      tools: wantsImages ? [] : ["read", "bash", "edit", "write"],
+      tools: wantsImages ? [] : ['read', 'bash', 'edit', 'write'],
       ...(model ? { model } : {}),
       ...(resourceLoader ? { resourceLoader } : {}),
-    });
-    session = result.session;
+    })
+    session = result.session
   } catch (err: unknown) {
-    send("error", { message: err instanceof Error ? err.message : "Failed to create session" });
-    send("done", {});
-    res.end();
-    return;
+    send('error', { message: err instanceof Error ? err.message : 'Failed to create session' })
+    send('done', {})
+    res.end()
+    return
   }
 
-  const sessionId = crypto.randomUUID();
-  sessions.set(sessionId, session);
-  let ended = false;
+  const sessionId = crypto.randomUUID()
+  sessions.set(sessionId, session)
+  let ended = false
 
   function cleanup() {
     if (!ended) {
-      ended = true;
-      unsubscribe();
-      sessions.delete(sessionId);
+      ended = true
+      unsubscribe()
+      sessions.delete(sessionId)
     }
   }
 
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
     switch (event.type) {
-      case "turn_start":
+      case 'turn_start':
         // Reset the plan buffer so each turn's steps are independent.
-        previewCtrl.assistantText = "";
-        break;
-      case "message_update": {
-        const ame = event.assistantMessageEvent;
-        if (ame.type === "text_delta") {
-          previewCtrl.assistantText += ame.delta;
-          send("text", { content: ame.delta });
+        previewCtrl.assistantText = ''
+        break
+      case 'message_update': {
+        const ame = event.assistantMessageEvent
+        if (ame.type === 'text_delta') {
+          previewCtrl.assistantText += ame.delta
+          send('text', { content: ame.delta })
         }
-        break;
+        break
       }
-      case "tool_execution_start":
-        send("tool_call", {
+      case 'tool_execution_start':
+        send('tool_call', {
           tool_call_id: event.toolCallId,
           tool_name: event.toolName,
           arguments: event.args as Record<string, unknown>,
-        });
-        break;
-      case "tool_execution_end":
-        send("tool_result", {
+        })
+        break
+      case 'tool_execution_end':
+        send('tool_result', {
           tool_call_id: event.toolCallId,
-          output: typeof event.result === "string" ? event.result : JSON.stringify(event.result),
+          output: typeof event.result === 'string' ? event.result : JSON.stringify(event.result),
           is_error: event.isError,
-        });
-        break;
-      case "agent_end": {
+        })
+        break
+      case 'agent_end': {
         for (const msg of event.messages ?? []) {
-          if ("role" in msg && msg.role === "assistant") {
-            const m = msg as { stopReason?: string; errorMessage?: string; usage?: { input: number; output: number } };
-            if (m.stopReason === "error" && m.errorMessage) {
-              send("error", { message: m.errorMessage });
+          if ('role' in msg && msg.role === 'assistant') {
+            const m = msg as {
+              stopReason?: string
+              errorMessage?: string
+              usage?: { input: number; output: number }
+            }
+            if (m.stopReason === 'error' && m.errorMessage) {
+              send('error', { message: m.errorMessage })
             }
             if (m.usage) {
-              send("usage", { input_tokens: m.usage.input || 0, output_tokens: m.usage.output || 0 });
+              send('usage', { input_tokens: m.usage.input || 0, output_tokens: m.usage.output || 0 })
             }
           }
         }
-        send("done", {});
-        cleanup();
-        res.end();
-        break;
+        send('done', {})
+        cleanup()
+        res.end()
+        break
       }
     }
-  });
+  })
 
-  const userMessages = (messages as Array<{ role: string; content: unknown }>).filter(m => m.role === "user");
-  const lastUserMsg = userMessages[userMessages.length - 1];
+  const userMessages = (messages as Array<{ role: string; content: unknown }>).filter(
+    (m) => m.role === 'user',
+  )
+  const lastUserMsg = userMessages[userMessages.length - 1]
   if (!lastUserMsg) {
-    send("error", { message: "No user message found" });
-    send("done", {});
-    cleanup();
-    res.end();
-    return;
+    send('error', { message: 'No user message found' })
+    send('done', {})
+    cleanup()
+    res.end()
+    return
   }
 
   try {
-    const { text, images } = toPromptInput(lastUserMsg.content);
-    const sendImages = imagesDropped ? [] : images;
-    await session.prompt(text, sendImages.length > 0 ? { images: sendImages } : undefined);
+    const { text, images } = toPromptInput(lastUserMsg.content)
+    const sendImages = imagesDropped ? [] : images
+    await session.prompt(text, sendImages.length > 0 ? { images: sendImages } : undefined)
   } catch (err: unknown) {
     if (!ended) {
-      send("error", { message: err instanceof Error ? err.message : "Unknown error" });
-      send("done", {});
-      cleanup();
-      res.end();
+      send('error', { message: err instanceof Error ? err.message : 'Unknown error' })
+      send('done', {})
+      cleanup()
+      res.end()
     }
   }
 
-  req.on("close", cleanup);
-});
+  req.on('close', cleanup)
+})
 
-export default router;
+export default router

@@ -3,9 +3,7 @@ import { renderHook } from '@testing-library/react'
 import { useKeyboardShortcuts } from '../useKeyboardShortcuts'
 
 function fireKey(key: string, opts: Partial<KeyboardEventInit> = {}) {
-  window.dispatchEvent(
-    new KeyboardEvent('keydown', { key, metaKey: true, bubbles: true, ...opts }),
-  )
+  window.dispatchEvent(new KeyboardEvent('keydown', { key, metaKey: true, bubbles: true, ...opts }))
 }
 
 describe('useKeyboardShortcuts', () => {

@@ -53,9 +53,9 @@ describe('ApprovalModal', () => {
     expect(screen.getByText(/modify files or execute commands/)).toBeInTheDocument()
   })
 
-  it('shows countdown timer', () => {
+  it('shows no countdown', () => {
     render(<ApprovalModal request={mockRequest} />)
-    expect(screen.getByText(/Auto-reject in 30s/)).toBeInTheDocument()
+    expect(screen.queryByText(/Auto-reject/)).not.toBeInTheDocument()
   })
 
   it('calls respondPermission with true on Approve click', async () => {
@@ -78,17 +78,17 @@ describe('ApprovalModal', () => {
     expect(respondSpy).toHaveBeenCalledWith('tc-1', false)
   })
 
-  it('auto-rejects after countdown', async () => {
+  it('does not reject on its own, however long the user takes', async () => {
     const respondSpy = vi.fn()
     useChatStore.setState({ respondPermission: respondSpy } as any)
 
     render(<ApprovalModal request={mockRequest} />)
 
-    // Advance 30 seconds
     await act(async () => {
-      vi.advanceTimersByTime(30_000)
+      vi.advanceTimersByTime(10 * 60_000)
     })
 
-    expect(respondSpy).toHaveBeenCalledWith('tc-1', false)
+    expect(respondSpy).not.toHaveBeenCalled()
+    expect(screen.getByText('Approve')).toBeInTheDocument()
   })
 })

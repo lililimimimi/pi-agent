@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Loader2, Server, Info, Plus } from 'lucide-react'
-import { fetchProviders, fetchModelCatalog, type ProviderInfo, type CatalogGroup } from '@/services/api'
+import { fetchProviders } from '@/services/api/providers'
+import { fetchModelCatalog } from '@/services/api/models'
 import { ProviderCard } from '@/components/settings/ProviderCard'
 import { AddProviderDialog } from '@/components/settings/AddProviderDialog'
 import { Button } from '@/components/ui/button'
+import { reportError } from '@/lib/appError'
+import type { ProviderInfo } from '@/services/api/providers'
+import type { CatalogGroup } from '@/services/api/models'
 
 type SettingsModalProps = {
   open: boolean
@@ -23,13 +27,19 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
   useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose])
 
   // Reset to first tab when reopened
-  useEffect(() => { if (open) setTab('providers') }, [open])
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setTab('providers')
+  }
 
   if (!open) return null
 
@@ -37,7 +47,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     <div
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm"
-      onMouseDown={(e) => { if (e.target === overlayRef.current) onClose() }}
+      onMouseDown={(e) => {
+        if (e.target === overlayRef.current) onClose()
+      }}
     >
       <div className="bg-card rounded-2xl shadow-2xl border border-border/50 w-[min(960px,calc(100vw-48px))] h-[min(720px,calc(100vh-64px))] flex flex-col overflow-hidden">
         {/* Title bar */}
@@ -94,8 +106,12 @@ function ProvidersPage() {
   const load = async () => {
     // Independent requests: a problem with one never empties the other
     await Promise.all([
-      fetchProviders().then(setProviders).catch(() => {}),
-      fetchModelCatalog().then(setCatalog).catch(() => {}),
+      fetchProviders()
+        .then(setProviders)
+        .catch((e) => reportError('Could not load the providers', e)),
+      fetchModelCatalog()
+        .then(setCatalog)
+        .catch((e) => reportError('Could not load the model list', e)),
     ])
   }
 
@@ -108,7 +124,8 @@ function ProvidersPage() {
     <div>
       <h3 className="text-sm font-semibold mb-1">Providers</h3>
       <p className="text-sm text-muted-foreground mb-4">
-        Configure API credentials for each provider, then enable the models to display in the model picker. Credentials are stored locally on this device.
+        Configure API credentials for each provider, then enable the models to display in the model picker.
+        Credentials are stored locally on this device.
       </p>
 
       {loading ? (

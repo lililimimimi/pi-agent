@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, act, waitFor } from '@testing-library/react'
+import { screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderHook } from '@testing-library/react'
-import { ToastProvider, useToast } from '@/components/Toast'
+import { ToastProvider } from '@/components/Toast'
+import { useToast } from '@/components/useToast'
 import type { ReactNode } from 'react'
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -18,9 +19,7 @@ describe('Toast', () => {
   it('useToast throws when used outside ToastProvider', () => {
     // Suppress console.error from React for this test
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(() => renderHook(() => useToast())).toThrow(
-      'useToast must be used within a <ToastProvider>',
-    )
+    expect(() => renderHook(() => useToast())).toThrow('useToast must be used within a <ToastProvider>')
     spy.mockRestore()
   })
 

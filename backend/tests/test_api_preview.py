@@ -4,6 +4,7 @@ Tests for the execution preview endpoints.
 The bridge owns pending-preview state, so the backend endpoints only
 forward confirm/cancel requests. httpx is mocked to avoid a live bridge.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -16,6 +17,7 @@ from httpx import ASGITransport, AsyncClient
 @pytest.fixture
 async def client():
     from app.main import app
+
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as c:
@@ -84,5 +86,6 @@ async def test_chat_carries_execution_preview_flag(client: AsyncClient):
     assert r.status_code == 200
     session_id = r.json()["session_id"]
 
-    from app.api.chat import _sessions
-    assert _sessions[session_id].execution_preview is False
+    from app.services.chat_sessions import get_chat_session
+
+    assert get_chat_session(session_id).execution_preview is False

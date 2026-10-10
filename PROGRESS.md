@@ -153,14 +153,65 @@
 | Google Gemini | `GEMINI_API_KEY` | ✅ |
 | Ollama | Base URL（本地，无需 key）| ✅ |
 
-### 待完成（模块 18–19）
+### 模块 18 具体交付（功能批次）
 
-> 模块 17 已验收。
+> 代码和测试已完成，**未提交**（HEAD 仍为 `7c67552`）。你已在浏览器里测试通过。
+
+| 类别 | 内容 |
+|------|------|
+| A 冒烟测试 | `frontend/src/main.smoke.test.tsx` 挂载真实入口，检查输入框和 New chat 按钮；`npm run smoke`。把入口临时换成占位组件时变红 |
+| B 编辑重发 | 用户消息的编辑按钮，保存后删除之后的对话并重新发送；会话文件按"第 N 条用户消息"截断（`POST /api/sessions/:id/truncate`）；store 动作 `resendFrom` |
+| C 小改动 | 自动滚动只在底部附近跟随；复制整条回复（原始文字）；重新生成最后一条回复（`regenerate`）；停止时保存已输出的文字（`POST /api/chat/stop/:id`）；关闭标签页或断开连接时同样保存（`finally`） |
+| D 确认 | 每次写操作单独确认（`needsPreview`，去掉"确认一次后放行"的短路）；去掉 60 秒超时（bridge、ExecutionPreviewCard、ApprovalModal）；等待确认时标题栏显示 "Awaiting approval" |
+| E 测试和质量 | 供应商卡片、侧边栏的接线测试；lint 零警告（原来的两处忽略注释已去掉，耗时死代码已删，耗时功能留到模块 9） |
+| F 输入和键盘 | 上下箭头翻看本页发送过的消息（`lib/inputHistory.ts`，只在输入框为空或未改动时生效）；Esc 停止生成（输入框有焦点时）；Cmd+Enter 发送 |
+| 后端错误统一 | `app/errors.py`：每个异常类自带状态码；所有错误统一为 `{"error": {"code", "message"}}`（包括框架的 404 和 422）；会话接口返回 Pydantic 模型；Pi 格式会话返回 409 并说明原因 |
+| 工程 | `.nvmrc` 固定 Node 22.19.0；`pyproject.toml` 增加 ruff 配置（line-length 88，忽略 PLE1205 因 loguru 的 `{}` 占位符）；`mypy --strict app` 通过 |
+
+**测试结果**：前端 188/188，后端 178/178，bridge 52/52，冒烟 1/1；`tsc -b` 零错误，`npm run lint` 零警告，`npm run build` 成功；`ruff check` 与格式检查通过，`mypy --strict app` 零错误。
+
+**偏离计划的地方**
+
+- 标题栏提示用英文 "Awaiting approval"（计划写的是"等待确认"），你决定保留英文。
+- 计划要求先写失败测试再写实现，实际大部分是先实现后补测试。
+- 分支名为 `feature/m18-feature-batch`，最初的一次提交已撤销，改动在工作区里等待按"重构/格式"和"功能"拆分提交。
+
+### 待完成（模块 19–22）
+
+> 模块 17 已验收，模块 18 已测试通过，待提交。
 
 | 模块 | 文件 | 内容 |
 |------|------|------|
-| 18 | 18-tauri.md | Tauri 桌面打包 |
-| 19 | 19-docker.md | Docker 容器隔离（备用） |
+| 19 | 19-diff-view.md | 看改动（diff） |
+| 20 | 20-agent-webapp.md | Agent 网页版 |
+| 21 | 21-tauri.md | Tauri 桌面打包 |
+| 22 | 22-docker.md | Docker 容器隔离（备用） |
+
+## 模块 18 之后的整理（按规范对齐）
+
+> 未提交（HEAD 仍为 `7c67552`）。以下为工作区中的改动。
+
+| 类别 | 内容 |
+|------|------|
+| 格式 | 前端加 Prettier（`frontend/.prettierrc`：单引号、不加分号、行宽 110）；bridge 用同一份配置；`npm run format` / `format:check` |
+| 静默失败 → 提示 | 前端：原 16 处 `.catch(() => {})` 全部改为错误提示。store 没有 React 上下文，经 `lib/appError.ts` 的 `reportError` 发出事件，`ToastProvider` 显示。后端：原 8 处 `except … pass` 全部去掉，能忽略的加 warning 日志；创建聊天时会话文件丢失改为照常聊天并记录警告 |
+| 错误读取 | 所有失败响应统一经 `services/api/client.ts` 的 `requestError`：有后端 `error.message` 就显示它，否则显示兜底文字加状态码 |
+| API 拆分 | `services/api.ts` 拆为 `services/api/{client,chat,sessions,projects,files,providers,models}.ts`，没有 barrel 文件 |
+| Zod 校验 | `lib/schemas.ts` 增加会话、项目、文件、目录、创建聊天、SSE 事件的 schema；类型由 schema 推出。SSE 中格式错误的事件报错，不再跳过 |
+| 复制与消息组件 | `hooks/useCopyToClipboard.ts`（三处复制共用，卸载时清理定时器）；`MessageBubble.tsx` 拆为 `components/chat/message/`（CodeBlock、ListBlock、ToolCallGroup、MessageActions、EditMessageForm、assistantMarkdown、markdownText） |
+| 后端服务层 | `chat.py` 只剩路由（320 → 106 行）；`services/chat_content.py`（内容校验与序列化）、`services/chat_sessions.py`（新增 `open_chat`）、`services/chat_stream.py`（新增 `stream_turn`：转发 bridge 的流、保存回复、更新模型状态） |
+| Sidebar 拆分 | `Sidebar.tsx` 556 → 289 行；`sidebar/SessionRow.tsx`、`ProjectRow.tsx`、`RenameInput.tsx` |
+| store 拆分 | "记住上次打开的位置"移到 `stores/lastView.ts`；`chatStore.ts` 507 行，未再拆（会话、项目、消息、权限、流式输出耦合紧，见「当前问题」） |
+| 测试 | 新增：`AppErrorToast`、`requestError`、`validation`（SSE 与创建聊天的校验）、后端 `test_error_format`，以及关闭标签页时保存的测试；`test_stop_keeps_reply` 增加断开连接用例 |
+
+**测试结果**：前端 197/197，后端 178/178，bridge 52/52，冒烟 1/1；tsc 零错误，lint 零警告，Prettier 通过，`npm run build` 成功；ruff 与格式检查通过，`mypy --strict app` 零错误。
+
+**依赖变化**：前端、bridge 各新增开发依赖 `prettier@3`（`package.json` 与锁文件已更新）。
+
+**偏离计划或未做的**
+
+- 规范中的 `{"data": ...}` 包装、`/api/v1/` 前缀、动词路由（`/chat/stop` 等）、TanStack Query、`src/features/` 目录、React Hook Form、factory_boy：按决定不改代码。skill 文件也没有改，需要的话再单独改。
+- 测试的 `test_{action}_{scenario}_{expected}` 命名：新测试按此写，老测试未逐个改。
 
 ## 架构决策（前端，轻量方案）
 
@@ -217,12 +268,21 @@
 - **README.md**：暂时为空，等项目全部完成后再编写。
 - **Test all**：暂不实现。每个模型已有开关与测试按钮。
 - **docs/superpowers/**：2025 年的旧文档，待决定保留或归档。
-- **执行确认**：只读的 `ls` 也会弹出确认，待决定是否只对写入与运行类操作确认。
+- **执行确认**：只读的 `ls` 也会弹出确认（截图里的 `ls …; echo …` 只能看到前 60 个字符，需要完整命令才能查清）。
+- **模型自己查看 `~/.claude/`**：代码没有指示，是模型自行探索；尚未阻止。
+- **Pi 原生格式会话**：不能编辑或重新生成（返回 409，界面提示要新开对话）。原因是程序只改写自己格式的会话文件。
+- **确认框不超时**：没人回应时，项目重命名会一直被锁住。
+- **Esc 停止**：只在输入框有焦点时生效。
+- **`InputBar.tsx` 的一处 `eslint-disable`**：原代码就有，未处理。
+- **`chatStore.ts` 507 行**：会话、项目、消息、权限、流式输出耦合紧，拆分前要先理清状态边界。
+- **`backend/app/sessions/store.py` 424 行**：会话和项目的存储混在一起，项目存储应拆到单独文件。
+- **前端类型断言 19 处**：多为 DOM 事件和 React 类型；`ToolCallCard` 解析工具输出的几处是未校验的 JSON，可以改成 schema。
 - **旧会话的重复记录**：之前保存的会话里有重复的历史，未自动清理。
 - **Claude.ai 订阅**：登录偶尔会失效，需要重新登录。
 - **空的模型列表**：有些供应商不提供模型列表接口，添加后列表为空。
 
 ## 下一步
 
-1. 决定「当前问题」中需要修复的项。
-2. 开始模块 18（`docs/plans/18-tauri.md`）。
+1. 审核模块 18 和本次整理的改动，按"格式和类型"、"功能"、"整理"拆成几个提交并提交（由你提交）。
+2. 开始模块 19（`docs/plans/19-diff-view.md`）。
+3. 视需要处理「当前问题」中的项目。

@@ -3,14 +3,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useChatStore } from '@/stores/chatStore'
 import type { ToolCall, ToolResult } from '@/types'
-import { Wrench, Check, X, ChevronDown, ChevronRight, Clock, Loader2 } from 'lucide-react'
+import { Wrench, Check, X, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
 
 type ToolCallStatus = 'pending' | 'running' | 'done' | 'error' | 'rejected'
 
 type ToolCallCardProps = {
   toolCall: ToolCall
   result?: ToolResult
-  startTime?: number
 }
 
 function deriveStatus(result?: ToolResult): ToolCallStatus {
@@ -19,23 +18,29 @@ function deriveStatus(result?: ToolResult): ToolCallStatus {
   return 'done'
 }
 
-const statusConfig: Record<ToolCallStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }> = {
+const statusConfig: Record<
+  ToolCallStatus,
+  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }
+> = {
   pending: { label: 'pending', variant: 'outline' },
   running: { label: 'running', variant: 'default' },
-  done: { label: 'done', variant: 'outline', className: 'bg-green-500/10 text-green-600 border-green-500/20' },
+  done: {
+    label: 'done',
+    variant: 'outline',
+    className: 'bg-green-500/10 text-green-600 border-green-500/20',
+  },
   error: { label: 'error', variant: 'destructive' },
   rejected: { label: 'rejected', variant: 'destructive' },
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(1)}s`
 }
 
 /** 解析各种 tool result 格式，提取可读文本 */
 function extractResultText(raw: string): string {
   let parsed: unknown
-  try { parsed = JSON.parse(raw) } catch { return raw }
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return raw
+  }
 
   // Array of content blocks (Anthropic / pi SDK format)
   if (Array.isArray(parsed)) {
@@ -44,7 +49,10 @@ function extractResultText(raw: string): string {
       if (typeof item !== 'object' || item === null) continue
       const block = item as Record<string, unknown>
       // text block
-      if (typeof block.text === 'string') { parts.push(block.text); continue }
+      if (typeof block.text === 'string') {
+        parts.push(block.text)
+        continue
+      }
       // exit_code / value block
       if ('exitCode' in block || 'exit_code' in block || 'value' in block) {
         const code = block.exitCode ?? block.exit_code ?? block.value
@@ -53,7 +61,10 @@ function extractResultText(raw: string): string {
       }
       // any other block with a string field
       for (const v of Object.values(block)) {
-        if (typeof v === 'string' && v.length > 0) { parts.push(v); break }
+        if (typeof v === 'string' && v.length > 0) {
+          parts.push(v)
+          break
+        }
       }
     }
     return parts.length > 0 ? parts.join('\n').trimEnd() : raw
@@ -108,14 +119,13 @@ function getSummary(toolName: string, args: Record<string, unknown>): string {
   return ''
 }
 
-export function ToolCallCard({ toolCall, result, startTime }: ToolCallCardProps) {
+export function ToolCallCard({ toolCall, result }: ToolCallCardProps) {
   const approve = useChatStore((s) => s.approveToolCall)
   const [argsExpanded, setArgsExpanded] = useState(false)
   const [resultExpanded, setResultExpanded] = useState(false)
 
   const status = deriveStatus(result)
   const config = statusConfig[status]
-  const elapsed = startTime && result ? formatDuration(Date.now() - startTime) : undefined
   const summary = getSummary(toolCall.toolName, toolCall.arguments ?? {})
 
   return (
@@ -129,9 +139,7 @@ export function ToolCallCard({ toolCall, result, startTime }: ToolCallCardProps)
         )}
         <span className="font-mono text-sm text-foreground/70">{toolCall.toolName}</span>
         {summary && (
-          <span className="font-mono text-sm text-foreground/70 max-w-[300px] truncate">
-            {summary}
-          </span>
+          <span className="font-mono text-sm text-foreground/70 max-w-[300px] truncate">{summary}</span>
         )}
         <Badge
           variant={config.variant}
@@ -139,12 +147,6 @@ export function ToolCallCard({ toolCall, result, startTime }: ToolCallCardProps)
         >
           {config.label}
         </Badge>
-        {elapsed && (
-          <span className="flex items-center gap-0.5 text-xs text-muted-foreground ml-auto">
-            <Clock className="h-2.5 w-2.5" />
-            {elapsed}
-          </span>
-        )}
       </div>
 
       {/* Toggles + content */}
@@ -164,7 +166,11 @@ export function ToolCallCard({ toolCall, result, startTime }: ToolCallCardProps)
             onClick={() => setResultExpanded(!resultExpanded)}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
-            {resultExpanded ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
+            {resultExpanded ? (
+              <ChevronDown className="h-2.5 w-2.5" />
+            ) : (
+              <ChevronRight className="h-2.5 w-2.5" />
+            )}
             <span>Result</span>
           </button>
         )}

@@ -3,6 +3,7 @@ Tests for correlation IDs and the log line format.
 
 Correlation IDs live in contextvars, so concurrent requests must not see each other's IDs.
 """
+
 from __future__ import annotations
 
 import asyncio

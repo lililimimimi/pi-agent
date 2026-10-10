@@ -6,16 +6,17 @@ JSONL row types:
   - message: a conversation message (role, content)
   - tool_call / tool_result: tool interaction records
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-
 # ── JSONL record types ─────────────────────────────────────────────────────────
+
 
 class RecordType(str, Enum):
     META = "meta"
@@ -26,11 +27,12 @@ class RecordType(str, Enum):
 
 class SessionMeta(BaseModel):
     """First line of a .jsonl session file."""
+
     type: RecordType = Field(default=RecordType.META, frozen=True)
     id: str
     title: str
     project_id: str = ""
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class MessageRecord(BaseModel):
@@ -59,6 +61,7 @@ SessionRecord = SessionMeta | MessageRecord | ToolCallRecord | ToolResultRecord
 
 # ── Session summary (for listing) ─────────────────────────────────────────────
 
+
 class SessionSummary(BaseModel):
     id: str
     title: str
@@ -68,8 +71,9 @@ class SessionSummary(BaseModel):
 
 # ── Project model ──────────────────────────────────────────────────────────────
 
+
 class Project(BaseModel):
     id: str
     name: str
     path: str
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())

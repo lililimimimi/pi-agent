@@ -7,11 +7,15 @@ describe('isHiddenAutoProject', () => {
   })
 
   it('keeps an auto-detected project that has conversations', () => {
-    expect(isHiddenAutoProject({ id: 'pi-native:/Users/me/x' }, new Set(['pi-native:/Users/me/x']), 'general')).toBe(false)
+    expect(
+      isHiddenAutoProject({ id: 'pi-native:/Users/me/x' }, new Set(['pi-native:/Users/me/x']), 'general'),
+    ).toBe(false)
   })
 
   it('keeps the active project even when it is empty', () => {
-    expect(isHiddenAutoProject({ id: 'pi-native:/Users/me/x' }, new Set(), 'pi-native:/Users/me/x')).toBe(false)
+    expect(isHiddenAutoProject({ id: 'pi-native:/Users/me/x' }, new Set(), 'pi-native:/Users/me/x')).toBe(
+      false,
+    )
   })
 
   it('never hides projects the user added or General', () => {
