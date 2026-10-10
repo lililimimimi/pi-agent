@@ -47,7 +47,7 @@ def _parse_sse_lines(raw: str) -> list[dict]:
 # --------------------------------------------------------------------------- #
 
 
-async def test_health(client: AsyncClient):
+async def test_health_returns_ok(client: AsyncClient):
     r = await client.get("/api/health")
     assert r.status_code == 200
     assert r.json() == {"status": "ok"}

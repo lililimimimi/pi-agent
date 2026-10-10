@@ -6,6 +6,7 @@ import {
   type ChangeEvent,
   type ClipboardEvent,
   type DragEvent,
+  useCallback,
 } from 'react'
 import { useChatStore } from '@/stores/chatStore'
 import { rememberSent, sentHistory, stepHistory, NOT_BROWSING, type HistoryNav } from '@/lib/inputHistory'
@@ -42,12 +43,18 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
   const pendingFile = useFileBrowserStore((s) => s.pendingFile)
   const clearPendingFile = useFileBrowserStore((s) => s.clearPendingFile)
 
-  // File clicked in the sidebar tree → prefill the prompt and attach its content
-  useEffect(() => {
-    if (!pendingFile) return
+  // File clicked in the sidebar tree → prefill the prompt and attach its content.
+  // The last file handled is kept here, so each click is applied once.
+  const [handledFile, setHandledFile] = useState<PendingFile | null>(null)
+  if (pendingFile && pendingFile !== handledFile) {
+    setHandledFile(pendingFile)
     const prompt = `Please analyze this file: \`${pendingFile.path}\``
     setText((prev) => (prev.trim() ? `${prev.trimEnd()}\n${prompt}` : prompt))
     setAttachedFile(pendingFile)
+  }
+  // Clearing the shared store is a side effect on an external system, so it stays in an effect
+  useEffect(() => {
+    if (!pendingFile) return
     clearPendingFile()
     textareaRef.current?.focus()
   }, [pendingFile, clearPendingFile])
@@ -107,41 +114,44 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
   }
 
   // Validates and reads each image; used by the file picker and by paste
-  const addImageFiles = async (files: File[]) => {
-    const room = MAX_IMAGES_PER_MESSAGE - images.length
-    if (room <= 0) {
-      showToast({ type: 'error', message: `Up to ${MAX_IMAGES_PER_MESSAGE} images per message` })
-      return
-    }
-    if (files.length > room) {
-      showToast({ type: 'error', message: `You can add ${room} more image(s)` })
-    }
-    for (const file of files.slice(0, room)) {
-      const label = file.name || 'Image'
-      if (!isAllowedImageType(file.type)) {
-        showToast({ type: 'error', message: `${label}: only JPEG, PNG, GIF and WebP are supported` })
-        continue
+  const addImageFiles = useCallback(
+    async (files: File[]) => {
+      const room = MAX_IMAGES_PER_MESSAGE - images.length
+      if (room <= 0) {
+        showToast({ type: 'error', message: `Up to ${MAX_IMAGES_PER_MESSAGE} images per message` })
+        return
       }
-      try {
-        // Oversized screenshots are downscaled first, then checked against the 5MB limit
-        const blob = await prepareImage(file)
-        const error = validateImageFile(blob)
-        if (error) {
-          showToast({ type: 'error', message: `${label}：${error}` })
+      if (files.length > room) {
+        showToast({ type: 'error', message: `You can add ${room} more image(s)` })
+      }
+      for (const file of files.slice(0, room)) {
+        const label = file.name || 'Image'
+        if (!isAllowedImageType(file.type)) {
+          showToast({ type: 'error', message: `${label}: only JPEG, PNG, GIF and WebP are supported` })
           continue
         }
-        const dataUrl = await readAsDataUrl(blob)
-        const attachment: ImageAttachment = {
-          id: `img-${++attachCounter}`,
-          name: file.name || 'pasted-image',
-          dataUrl,
+        try {
+          // Oversized screenshots are downscaled first, then checked against the 5MB limit
+          const blob = await prepareImage(file)
+          const error = validateImageFile(blob)
+          if (error) {
+            showToast({ type: 'error', message: `${label}：${error}` })
+            continue
+          }
+          const dataUrl = await readAsDataUrl(blob)
+          const attachment: ImageAttachment = {
+            id: `img-${++attachCounter}`,
+            name: file.name || 'pasted-image',
+            dataUrl,
+          }
+          setImages((prev) => (prev.length >= MAX_IMAGES_PER_MESSAGE ? prev : [...prev, attachment]))
+        } catch {
+          showToast({ type: 'error', message: 'Could not read the image. Try again.' })
         }
-        setImages((prev) => (prev.length >= MAX_IMAGES_PER_MESSAGE ? prev : [...prev, attachment]))
-      } catch {
-        showToast({ type: 'error', message: 'Could not read the image. Try again.' })
       }
-    }
-  }
+    },
+    [images.length, showToast],
+  )
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
@@ -176,9 +186,7 @@ export function InputBar({ bare = false }: { bare?: boolean }) {
     }
     window.addEventListener('paste', onWindowPaste)
     return () => window.removeEventListener('paste', onWindowPaste)
-    // addImageFiles reads the current `images`; re-register when it changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [images.length])
+  }, [addImageFiles])
 
   // Drag an image file onto the input area
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {

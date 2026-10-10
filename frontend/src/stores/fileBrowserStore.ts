@@ -70,7 +70,7 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
       if (get().rootPath !== root) return
       set((s) => ({ childrenByDir: { ...s.childrenByDir, [dir]: node.children ?? [] } }))
     } catch (e) {
-      if (get().rootPath === root) set({ error: (e as Error).message })
+      if (get().rootPath === root) set({ error: e instanceof Error ? e.message : String(e) })
     } finally {
       set((s) => {
         const loadingDirs = new Set(s.loadingDirs)
@@ -102,7 +102,7 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
       const opened = { path: file.path, content: file.content }
       set({ pendingFile: opened, preview: opened, error: null })
     } catch (e) {
-      set({ error: (e as Error).message })
+      set({ error: e instanceof Error ? e.message : String(e) })
     }
   },
 

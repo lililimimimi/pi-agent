@@ -33,6 +33,11 @@ const statusConfig: Record<
   rejected: { label: 'rejected', variant: 'destructive' },
 }
 
+/** True for a plain JSON object (not null, not an array) */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 /** 解析各种 tool result 格式，提取可读文本 */
 function extractResultText(raw: string): string {
   let parsed: unknown
@@ -45,9 +50,8 @@ function extractResultText(raw: string): string {
   // Array of content blocks (Anthropic / pi SDK format)
   if (Array.isArray(parsed)) {
     const parts: string[] = []
-    for (const item of parsed) {
-      if (typeof item !== 'object' || item === null) continue
-      const block = item as Record<string, unknown>
+    for (const block of parsed) {
+      if (!isRecord(block)) continue
       // text block
       if (typeof block.text === 'string') {
         parts.push(block.text)
@@ -71,8 +75,8 @@ function extractResultText(raw: string): string {
   }
 
   // Plain object
-  if (typeof parsed === 'object' && parsed !== null) {
-    const obj = parsed as Record<string, unknown>
+  if (isRecord(parsed)) {
+    const obj = parsed
     const parts: string[] = []
     for (const key of ['output', 'text', 'content', 'stdout']) {
       if (typeof obj[key] === 'string') parts.push(obj[key] as string)
