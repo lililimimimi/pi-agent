@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { statSync } from 'node:fs'
 
 /**
  * Chooses the working directory for an agent session.
@@ -6,12 +6,12 @@ import { statSync } from "node:fs";
  * bridge's own directory, so a bad path can never break the chat.
  */
 export function resolveSessionCwd(requested: unknown, fallback: string): string {
-  if (typeof requested !== "string" || requested.trim() === "") return fallback;
+  if (typeof requested !== 'string' || requested.trim() === '') return fallback
   try {
-    if (statSync(requested).isDirectory()) return requested;
+    if (statSync(requested).isDirectory()) return requested
   } catch {
     // fall through to the fallback
   }
-  console.warn(`[bridge] project path is not a directory, using ${fallback}: ${requested}`);
-  return fallback;
+  console.warn(`[bridge] project path is not a directory, using ${fallback}: ${requested}`)
+  return fallback
 }
