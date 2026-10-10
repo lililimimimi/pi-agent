@@ -2,12 +2,14 @@
 Keep config.json in step with the logins and keys that live outside it:
 Pi's auth.json (Claude.ai and ChatGPT subscriptions) and the environment.
 """
+
 from __future__ import annotations
 
 import os
 
-from app.config.meta import DEFAULT_MODELS, ENV_KEY_MAP, _DEFAULT_PROVIDER
+from app.config.meta import _DEFAULT_PROVIDER, DEFAULT_MODELS, ENV_KEY_MAP
 from app.config.store import load_config, save_config
+
 
 def sync_pi_oauth_to_config() -> None:
     """Detect Pi CLI OAuth token and auto-register the 'pi' provider.
@@ -16,8 +18,9 @@ def sync_pi_oauth_to_config() -> None:
     'pi' provider as enabled + connected with the default model list.
     Otherwise mark it as not connected.
     """
-    from app.config.pi_oauth import is_available, get_expires_at
     import datetime
+
+    from app.config.pi_oauth import get_expires_at, is_available
 
     cfg = load_config()
     p = cfg["providers"].setdefault("pi", dict(_DEFAULT_PROVIDER))
@@ -26,20 +29,21 @@ def sync_pi_oauth_to_config() -> None:
         expires_at = get_expires_at()
         expires_str = (
             datetime.datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d")
-            if expires_at else "unknown"
+            if expires_at
+            else "unknown"
         )
-        p["enabled"]   = True
+        p["enabled"] = True
         p["connected"] = True
-        p["api_key"]   = "[oauth]"          # sentinel — not a real key
-        p["base_url"]  = ""
-        p["note"]      = f"Pi CLI OAuth · expires {expires_str}"
+        p["api_key"] = "[oauth]"  # sentinel — not a real key
+        p["base_url"] = ""
+        p["note"] = f"Pi CLI OAuth · expires {expires_str}"
         if not p.get("models"):
             p["models"] = list(DEFAULT_MODELS.get("pi", []))
     else:
-        p["enabled"]   = False
+        p["enabled"] = False
         p["connected"] = False
-        p["api_key"]   = ""
-        p["note"]      = "Pi not logged in (run: pi /login)"
+        p["api_key"] = ""
+        p["note"] = "Pi not logged in (run: pi /login)"
 
     save_config(cfg)
 
@@ -47,13 +51,18 @@ def sync_pi_oauth_to_config() -> None:
 def sync_codex_login_to_config() -> None:
     """Mark the OpenAI subscription as connected when Pi has a Codex login."""
     from app.config.pi_oauth import is_logged_in
+
     cfg = load_config()
     p = cfg["providers"].setdefault("openai-codex", dict(_DEFAULT_PROVIDER))
     connected = is_logged_in("openai-codex")
     p["enabled"] = connected
     p["connected"] = connected
     p["api_key"] = "[oauth]" if connected else ""
-    p["note"] = "Pi OpenAI login" if connected else "Not logged in (run: pi /login, choose OpenAI)"
+    p["note"] = (
+        "Pi OpenAI login"
+        if connected
+        else "Not logged in (run: pi /login, choose OpenAI)"
+    )
     save_config(cfg)
 
 
@@ -72,14 +81,15 @@ def sync_env_vars_to_config() -> None:
         p = cfg["providers"].setdefault(pid, dict(_DEFAULT_PROVIDER))
         if p.get("api_key"):  # user already has a key set — don't overwrite
             continue
-        p["api_key"]   = key
-        p["enabled"]   = True
+        p["api_key"] = key
+        p["enabled"] = True
         p["connected"] = True
         if not p.get("models"):
             p["models"] = list(DEFAULT_MODELS.get(pid, []))
         changed = True
     if changed:
         save_config(cfg)
+
 
 # ---------------------------------------------------------------------------
 # Config file location

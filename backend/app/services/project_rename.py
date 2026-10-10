@@ -3,6 +3,7 @@ Rename a project's folder on disk, and everything that points at it:
 the project record, our session files (project_id = path) and Pi's per-folder
 session directory (--<path with / as ->--, whose files record the cwd).
 """
+
 from __future__ import annotations
 
 import json
@@ -10,6 +11,7 @@ import os
 from collections import Counter
 from pathlib import Path
 
+from app.errors import InvalidRequestError, NotFoundError
 from app.sessions import store
 from app.sessions.models import Project
 
@@ -29,7 +31,7 @@ def mark_done(path: str) -> None:
             del _running[path]
 
 
-class RenameError(ValueError):
+class RenameError(InvalidRequestError):
     """The rename was refused; the message says why."""
 
 
@@ -58,7 +60,7 @@ def rename_project(project_id: str, new_name: str) -> Project:
     projects = store._load_projects()
     index = next((i for i, p in enumerate(projects) if p["id"] == project_id), None)
     if index is None:
-        raise FileNotFoundError(f"Project '{project_id}' not found")
+        raise NotFoundError(f"Project '{project_id}' not found")
 
     old_path = projects[index]["path"]
     old = Path(old_path)
@@ -73,10 +75,14 @@ def rename_project(project_id: str, new_name: str) -> Project:
     if new.exists():
         raise RenameError(f"A folder named '{name}' already exists here.")
     if _running.get(old_path, 0) > 0:
-        raise RenameError("A chat in this project is still running. Wait for it to finish, then rename.")
+        raise RenameError(
+            "A chat in this project is still running. Wait for it to finish, then rename."
+        )
     for other in projects:
         if other["id"] != project_id and other["path"].startswith(old_path + "/"):
-            raise RenameError("Another project lives inside this folder. Rename or move it first.")
+            raise RenameError(
+                "Another project lives inside this folder. Rename or move it first."
+            )
 
     sessions_dir = store._sessions_dir()
     old_native = sessions_dir / _native_dir_name(old_path)

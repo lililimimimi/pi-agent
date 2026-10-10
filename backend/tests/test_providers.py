@@ -6,12 +6,10 @@ Coverage:
 - api/providers.py: GET /api/providers, PUT /api/providers/:id,
                     POST /api/providers/:id/test, GET /api/providers/:id/models
 """
+
 from __future__ import annotations
 
-import json
-import time
 from pathlib import Path
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -30,16 +28,19 @@ def make_config_path(tmp_path: Path) -> Path:
 
 def test_mask_key_empty():
     from app.config.store import mask_key
+
     assert mask_key("") == ""
 
 
 def test_mask_key_short():
     from app.config.store import mask_key
+
     assert mask_key("abc") == "****"
 
 
 def test_mask_key_normal():
     from app.config.store import mask_key
+
     result = mask_key("sk-ant-api03-xxxx")
     assert result.startswith("sk-ant-a")
     assert result.endswith("****")
@@ -53,8 +54,9 @@ def test_load_config_default(tmp_path: Path, monkeypatch):
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.store import load_config
     from app.config.meta import PROVIDER_IDS
+    from app.config.store import load_config
+
     cfg = load_config()
     assert "providers" in cfg
     for pid in PROVIDER_IDS:
@@ -86,7 +88,7 @@ def test_update_provider_config(tmp_path: Path, monkeypatch):
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.store import update_provider_config, get_provider_config
+    from app.config.store import get_provider_config, update_provider_config
 
     update_provider_config("deepseek", {"api_key": "sk-ds-key", "enabled": True})
     p = get_provider_config("deepseek")
@@ -100,9 +102,11 @@ def test_all_providers_masked_hides_keys(tmp_path: Path, monkeypatch):
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.store import update_provider_config, all_providers_masked
+    from app.config.store import all_providers_masked, update_provider_config
 
-    update_provider_config("openai", {"api_key": "sk-openai-real-secret", "enabled": True})
+    update_provider_config(
+        "openai", {"api_key": "sk-openai-real-secret", "enabled": True}
+    )
     providers = all_providers_masked()
 
     openai_cfg = next(p for p in providers if p["id"] == "openai")
@@ -116,8 +120,8 @@ def test_all_providers_masked_returns_all_five(tmp_path: Path, monkeypatch):
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
-    from app.config.store import all_providers_masked
     from app.config.meta import PROVIDER_IDS
+    from app.config.store import all_providers_masked
 
     result = all_providers_masked()
     ids = {p["id"] for p in result}
@@ -134,6 +138,7 @@ def client(tmp_path: Path, monkeypatch):
 
     # Import app after monkeypatching
     from app.main import app
+
     return TestClient(app)
 
 
@@ -141,7 +146,9 @@ def test_list_providers_returns_all(client: TestClient):
     resp = client.get("/api/providers")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 8   # pi + anthropic + deepseek + openai + openai-codex + gemini + siliconflow + ollama
+    assert (
+        len(data) == 8
+    )  # pi + anthropic + deepseek + openai + openai-codex + gemini + siliconflow + ollama
     ids = {p["id"] for p in data}
     assert "pi" in ids
     assert "anthropic" in ids
@@ -156,9 +163,11 @@ def test_list_providers_masks_keys(client: TestClient, tmp_path: Path, monkeypat
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
     from app.config.store import update_provider_config
+
     update_provider_config("deepseek", {"api_key": "sk-deepseek-real-secret"})
 
     from app.main import app
+
     with TestClient(app) as c:
         resp = c.get("/api/providers")
     data = resp.json()
@@ -195,9 +204,13 @@ def test_get_models_with_cache(client: TestClient, tmp_path: Path, monkeypatch):
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
     from app.config.store import update_provider_config
-    update_provider_config("anthropic", {"models": ["claude-3-haiku", "claude-opus-4-5"]})
+
+    update_provider_config(
+        "anthropic", {"models": ["claude-3-haiku", "claude-opus-4-5"]}
+    )
 
     from app.main import app
+
     with TestClient(app) as c:
         resp = c.get("/api/providers/anthropic/models")
     assert resp.status_code == 200
@@ -218,7 +231,9 @@ def test_test_provider_ollama_success(client: TestClient, monkeypatch):
     """Mock httpx for Ollama to return model list."""
     mock_response = MagicMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {"models": [{"name": "llama3"}, {"name": "mistral"}]}
+    mock_response.json.return_value = {
+        "models": [{"name": "llama3"}, {"name": "mistral"}]
+    }
     mock_response.raise_for_status = MagicMock()
 
     mock_client = AsyncMock()
@@ -245,18 +260,26 @@ def test_test_provider_anthropic_no_key(client: TestClient):
     assert "API key" in (data.get("error") or "")
 
 
-def test_test_provider_anthropic_with_key(client: TestClient, tmp_path: Path, monkeypatch):
+def test_test_provider_anthropic_with_key(
+    client: TestClient, tmp_path: Path, monkeypatch
+):
     from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
     from app.config.store import update_provider_config
+
     update_provider_config("anthropic", {"api_key": "sk-ant-test-key"})
 
     mock_response = MagicMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {"data": [{"id": "claude-3-5-sonnet-20241022"}, {"id": "claude-3-haiku-20240307"}]}
+    mock_response.json.return_value = {
+        "data": [
+            {"id": "claude-3-5-sonnet-20241022"},
+            {"id": "claude-3-haiku-20240307"},
+        ]
+    }
     mock_response.raise_for_status = MagicMock()
 
     mock_client = AsyncMock()
@@ -266,6 +289,7 @@ def test_test_provider_anthropic_with_key(client: TestClient, tmp_path: Path, mo
 
     with patch("app.services.discovery.httpx.AsyncClient", return_value=mock_client):
         from app.main import app
+
         with TestClient(app) as c:
             resp = c.post("/api/providers/anthropic/test")
 
@@ -283,6 +307,7 @@ def test_test_provider_http_error(client: TestClient, tmp_path: Path, monkeypatc
     monkeypatch.setattr(pmod, "_config_path", lambda: cfg_file)
 
     from app.config.store import update_provider_config
+
     update_provider_config("deepseek", {"api_key": "sk-bad-key"})
 
     import httpx as httpx_mod
@@ -291,7 +316,9 @@ def test_test_provider_http_error(client: TestClient, tmp_path: Path, monkeypatc
     mock_resp = MagicMock()
     mock_resp.status_code = 403
     mock_resp.text = "Forbidden"
-    http_error = httpx_mod.HTTPStatusError("403", request=mock_request, response=mock_resp)
+    http_error = httpx_mod.HTTPStatusError(
+        "403", request=mock_request, response=mock_resp
+    )
 
     mock_client = AsyncMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -302,6 +329,7 @@ def test_test_provider_http_error(client: TestClient, tmp_path: Path, monkeypatc
 
     with patch("app.services.discovery.httpx.AsyncClient", return_value=mock_client):
         from app.main import app
+
         with TestClient(app) as c:
             resp = c.post("/api/providers/deepseek/test")
 

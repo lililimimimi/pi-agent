@@ -7,13 +7,22 @@ GET /api/files/content?root=<dir>&path=<rel-file>     → text content of a file
 All paths in responses are relative to `root`. Requests whose resolved path
 escapes `root` (via `..`, absolute paths or symlinks) are rejected with 403.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
+
+from app.errors import (
+    ForbiddenError,
+    InvalidRequestError,
+    NotFoundError,
+    PayloadTooLargeError,
+    UnsupportedMediaError,
+)
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -43,6 +52,7 @@ class FileContent(BaseModel):
 # Helpers
 # --------------------------------------------------------------------------- #
 
+
 def _is_ignored(name: str) -> bool:
     return name in IGNORED_NAMES or name.endswith(IGNORED_SUFFIXES)
 
@@ -50,23 +60,23 @@ def _is_ignored(name: str) -> bool:
 def _resolve_root(root: str) -> Path:
     resolved = Path(root).expanduser().resolve()
     if not resolved.exists():
-        raise HTTPException(status_code=400, detail=f"Path does not exist: {resolved}")
+        raise InvalidRequestError(f"Path does not exist: {resolved}")
     if not resolved.is_dir():
-        raise HTTPException(status_code=400, detail=f"Path is not a directory: {resolved}")
+        raise InvalidRequestError(f"Path is not a directory: {resolved}")
     return resolved
 
 
 def _safe_join(root: Path, rel: str) -> Path:
     """Resolve `rel` under `root`, refusing anything that escapes or is ignored."""
     if Path(rel).is_absolute():
-        raise HTTPException(status_code=403, detail="Absolute paths are not allowed")
+        raise ForbiddenError("Absolute paths are not allowed")
     target = (root / rel).resolve()
     try:
         parts = target.relative_to(root).parts
     except ValueError:
-        raise HTTPException(status_code=403, detail="Path is outside project root")
+        raise ForbiddenError("Path is outside project root")
     if any(_is_ignored(part) for part in parts):
-        raise HTTPException(status_code=403, detail="Path is ignored")
+        raise ForbiddenError("Path is ignored")
     return target
 
 
@@ -83,10 +93,7 @@ def _iter_children(directory: Path, root: Path) -> list[Path]:
         entries = list(directory.iterdir())
     except (PermissionError, OSError):
         return []
-    visible = [
-        e for e in entries
-        if not _is_ignored(e.name) and _inside_root(e, root)
-    ]
+    visible = [e for e in entries if not _is_ignored(e.name) and _inside_root(e, root)]
     # Directories first, then files; case-insensitive alphabetical
     return sorted(visible, key=lambda e: (not e.is_dir(), e.name.lower()))
 
@@ -96,7 +103,9 @@ def _build_node(entry: Path, root: Path, depth: int) -> FileNode:
     if entry.is_dir():
         children = None
         if depth > 0:
-            children = [_build_node(c, root, depth - 1) for c in _iter_children(entry, root)]
+            children = [
+                _build_node(c, root, depth - 1) for c in _iter_children(entry, root)
+            ]
         return FileNode(name=entry.name, type="dir", path=rel, children=children)
     return FileNode(name=entry.name, type="file", path=rel, size=entry.stat().st_size)
 
@@ -104,6 +113,7 @@ def _build_node(entry: Path, root: Path, depth: int) -> FileNode:
 # --------------------------------------------------------------------------- #
 # Endpoints
 # --------------------------------------------------------------------------- #
+
 
 @router.get("/tree", response_model=FileNode)
 async def file_tree(
@@ -115,7 +125,7 @@ async def file_tree(
     root_path = _resolve_root(root)
     target = _safe_join(root_path, subdir) if subdir else root_path
     if not target.is_dir():
-        raise HTTPException(status_code=400, detail=f"Not a directory: {subdir or root}")
+        raise InvalidRequestError(f"Not a directory: {subdir or root}")
     return _build_node(target, root_path, depth)
 
 
@@ -128,18 +138,20 @@ async def file_content(
     root_path = _resolve_root(root)
     target = _safe_join(root_path, path)
     if not target.is_file():
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+        raise NotFoundError(f"File not found: {path}")
 
     size = target.stat().st_size
     if size > MAX_CONTENT_BYTES:
-        raise HTTPException(status_code=413, detail=f"File too large ({size} bytes)")
+        raise PayloadTooLargeError(f"File too large ({size} bytes)")
 
     data = target.read_bytes()
     if b"\x00" in data[:BINARY_PROBE_BYTES]:
-        raise HTTPException(status_code=415, detail="Binary files are not supported")
+        raise UnsupportedMediaError("Binary files are not supported")
     try:
         text = data.decode("utf-8")
     except UnicodeDecodeError:
-        raise HTTPException(status_code=415, detail="File is not UTF-8 text")
+        raise UnsupportedMediaError("File is not UTF-8 text")
 
-    return FileContent(path=target.relative_to(root_path).as_posix(), content=text, size=size)
+    return FileContent(
+        path=target.relative_to(root_path).as_posix(), content=text, size=size
+    )

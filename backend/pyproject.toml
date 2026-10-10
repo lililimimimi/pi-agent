@@ -27,3 +27,10 @@ testpaths = ["tests"]
 
 # Required: always install dev deps for this project
 # Run: pip install -e ".[dev]"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+# loguru formats messages with "{}"; pylint's logging rule reads them as stdlib logging and misfires
+ignore = ["PLE1205"]

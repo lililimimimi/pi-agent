@@ -10,6 +10,7 @@ Order (later entries take precedence):
 Missing files are skipped. Each rules file is a skill file with YAML frontmatter;
 the frontmatter is removed before injection.
 """
+
 from __future__ import annotations
 
 import os
@@ -18,7 +19,7 @@ from pathlib import Path
 
 from app.rules.detector import StackDetector
 
-_FRONTMATTER = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.S)
+_FRONTMATTER = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.DOTALL)
 PROJECT_RULES_PATH = Path(".assistant") / "rules.md"
 
 

@@ -4,6 +4,7 @@ Tests for stack detection and rules assembly.
 Uses temporary rules and project directories, so the real .pi/skills files
 are not needed for these tests.
 """
+
 from __future__ import annotations
 
 import json
@@ -40,7 +41,9 @@ def project(tmp_path: Path) -> Path:
     return p
 
 
-def _write_package_json(project: Path, deps: dict | None = None, dev: dict | None = None) -> None:
+def _write_package_json(
+    project: Path, deps: dict | None = None, dev: dict | None = None
+) -> None:
     (project / "package.json").write_text(
         json.dumps({"dependencies": deps or {}, "devDependencies": dev or {}}),
         encoding="utf-8",
@@ -50,6 +53,7 @@ def _write_package_json(project: Path, deps: dict | None = None, dev: dict | Non
 # --------------------------------------------------------------------------- #
 # StackDetector
 # --------------------------------------------------------------------------- #
+
 
 def test_detects_react_from_package_json_dependencies(project: Path):
     _write_package_json(project, deps={"react": "^19.0.0"})
@@ -62,7 +66,9 @@ def test_detects_react_from_dev_dependencies(project: Path):
 
 
 def test_detects_fastapi_from_pyproject(project: Path):
-    (project / "pyproject.toml").write_text('dependencies = ["fastapi>=0.115"]\n', encoding="utf-8")
+    (project / "pyproject.toml").write_text(
+        'dependencies = ["fastapi>=0.115"]\n', encoding="utf-8"
+    )
     assert StackDetector.detect(str(project)) == {"fastapi"}
 
 
@@ -89,6 +95,7 @@ def test_malformed_package_json_is_ignored(project: Path):
 # --------------------------------------------------------------------------- #
 # RulesEngine
 # --------------------------------------------------------------------------- #
+
 
 def test_global_rules_always_load(rules_dir: Path, project: Path):
     text = RulesEngine(rules_dir).build_rules(str(project))
@@ -117,7 +124,9 @@ def test_frontmatter_is_removed(rules_dir: Path, project: Path):
 def test_project_rules_come_last_and_win(rules_dir: Path, project: Path):
     _write_package_json(project, deps={"react": "^19.0.0"})
     (project / ".assistant").mkdir()
-    (project / ".assistant" / "rules.md").write_text("PROJECT-OVERRIDE", encoding="utf-8")
+    (project / ".assistant" / "rules.md").write_text(
+        "PROJECT-OVERRIDE", encoding="utf-8"
+    )
 
     text = RulesEngine(rules_dir).build_rules(str(project))
 
@@ -148,10 +157,12 @@ def test_no_project_path_skips_project_and_detection(rules_dir: Path):
 # Wiring: chat request → bridge request
 # --------------------------------------------------------------------------- #
 
+
 async def test_chat_forwards_rules_for_the_project_to_the_bridge(
     rules_dir: Path, project: Path, monkeypatch
 ):
     from unittest.mock import AsyncMock, MagicMock, patch
+
     from httpx import ASGITransport, AsyncClient
 
     from app.main import app
@@ -183,7 +194,9 @@ async def test_chat_forwards_rules_for_the_project_to_the_bridge(
 
     fake.stream = MagicMock(side_effect=_stream)
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         r = await client.post(
             "/api/chat",
             json={
@@ -194,7 +207,7 @@ async def test_chat_forwards_rules_for_the_project_to_the_bridge(
             },
         )
         session_id = r.json()["session_id"]
-        with patch("app.api.chat.httpx.AsyncClient", return_value=fake):
+        with patch("app.services.chat_stream.httpx.AsyncClient", return_value=fake):
             await client.get(f"/api/chat/stream/{session_id}")
 
     assert "REACT-RULES" in captured["json"]["rules"]
@@ -202,13 +215,18 @@ async def test_chat_forwards_rules_for_the_project_to_the_bridge(
     assert captured["json"]["cwd"] == str(project)
 
 
-async def test_new_session_remembers_its_project_folder(rules_dir: Path, project: Path, monkeypatch):
+async def test_new_session_remembers_its_project_folder(
+    rules_dir: Path, project: Path, monkeypatch
+):
     from httpx import ASGITransport, AsyncClient
+
     from app.main import app
     from app.sessions import store as session_store
 
     monkeypatch.setenv("RULES_DIR", str(rules_dir))
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         r = await client.post(
             "/api/chat",
             json={

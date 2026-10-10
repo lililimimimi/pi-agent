@@ -3,6 +3,7 @@ Discover the model list of a provider by asking its API.
 
 Each provider has its own endpoint and auth; the result is (models, error).
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -11,14 +12,13 @@ import httpx
 
 from app.config.meta import CUSTOM_PREFIX
 
-
 # ---------------------------------------------------------------------------
 # Connection test implementations
 # ---------------------------------------------------------------------------
 
 _OPENAI_COMPAT_PROVIDERS = {
-    "deepseek":    "https://api.deepseek.com",
-    "openai":      "https://api.openai.com",
+    "deepseek": "https://api.deepseek.com",
+    "openai": "https://api.openai.com",
     "siliconflow": "https://api.siliconflow.cn",
 }
 
@@ -43,7 +43,9 @@ async def discover_models(
         # User-added: OpenAI-compatible GET {base_url}/models
         url = f"{cfg.get('base_url', '').rstrip('/')}/models"
         async with httpx.AsyncClient(timeout=timeout) as client:
-            r = await client.get(url, headers={"Authorization": f"Bearer {cfg.get('api_key', '')}"})
+            r = await client.get(
+                url, headers={"Authorization": f"Bearer {cfg.get('api_key', '')}"}
+            )
         if r.status_code != 200:
             return [], f"HTTP {r.status_code}: {r.text[:160]}"
         ids = [m.get("id", "") for m in r.json().get("data", []) if isinstance(m, dict)]
@@ -51,7 +53,8 @@ async def discover_models(
 
     if provider_id == "pi":
         # Pi OAuth — token is read from ~/.pi/agent/auth.json, no user config needed
-        from app.config.pi_oauth import is_available, get_access_token
+        from app.config.pi_oauth import get_access_token, is_available
+
         if not is_available():
             return [], "Pi CLI OAuth token not found or expired. Run: pi /login"
         token = get_access_token()
@@ -60,16 +63,17 @@ async def discover_models(
                 r = await client.get(
                     "https://api.anthropic.com/v1/models",
                     headers={
-                        "Authorization":   f"Bearer {token}",
+                        "Authorization": f"Bearer {token}",
                         "anthropic-version": "2023-06-01",
-                        "anthropic-beta":    "oauth-2025-04-20",
+                        "anthropic-beta": "oauth-2025-04-20",
                     },
                 )
                 r.raise_for_status()
                 data = r.json()
                 # Only return tool-capable chat models (skip legacy/embedding)
                 models = [
-                    m["id"] for m in data.get("data", [])
+                    m["id"]
+                    for m in data.get("data", [])
                     if not any(x in m["id"] for x in ("embed", "moderat"))
                 ]
                 return models, None
@@ -101,7 +105,7 @@ async def discover_models(
                 r = await client.get(
                     "https://api.anthropic.com/v1/models",
                     headers={
-                        "x-api-key":         api_key,
+                        "x-api-key": api_key,
                         "anthropic-version": "2023-06-01",
                     },
                 )

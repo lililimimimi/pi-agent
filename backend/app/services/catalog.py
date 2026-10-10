@@ -1,19 +1,24 @@
 """Model catalog: every known model, which ones the user enabled, and their last test."""
+
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.config.meta import PROVIDER_IDS, PROVIDER_META
-from app.config.store import load_config, update_provider_config, known_provider
+from app.config.store import known_provider, load_config, update_provider_config
 from app.services.bridge import BridgeError, bridge_call, bridge_models
 
 
 def _configured(cfg_provider: dict[str, Any], provider_id: str) -> bool:
     if provider_id == "pi":
         return bool(cfg_provider.get("connected"))
-    return bool(cfg_provider.get("api_key") or cfg_provider.get("base_url") or cfg_provider.get("connected"))
+    return bool(
+        cfg_provider.get("api_key")
+        or cfg_provider.get("base_url")
+        or cfg_provider.get("connected")
+    )
 
 
 async def build_catalog() -> list[dict[str, Any]]:
@@ -35,7 +40,9 @@ async def build_catalog() -> list[dict[str, Any]]:
     # The Claude subscription (pi) runs through the bridge's Anthropic models,
     # so it lists exactly the models the bridge can run.
     if _configured(cfg["providers"].get("pi", {}), "pi") and "anthropic" in by_provider:
-        by_provider["pi"] = {mid: dict(m) for mid, m in by_provider["anthropic"].items()}
+        by_provider["pi"] = {
+            mid: dict(m) for mid, m in by_provider["anthropic"].items()
+        }
 
     for pid, p in cfg["providers"].items():
         if pid == "pi" or not _configured(p, pid):
@@ -44,7 +51,8 @@ async def build_catalog() -> list[dict[str, Any]]:
             mid = raw if isinstance(raw, str) else raw.get("id", "")
             if mid:
                 by_provider.setdefault(pid, {}).setdefault(
-                    mid, {"id": mid, "name": mid, "supports_images": False},
+                    mid,
+                    {"id": mid, "name": mid, "supports_images": False},
                 )
 
     order = {pid: i for i, pid in enumerate(PROVIDER_IDS)}
@@ -57,11 +65,13 @@ async def build_catalog() -> list[dict[str, Any]]:
             {**m, "enabled": m["id"] in enabled, "status": statuses.get(m["id"])}
             for m in by_provider[pid].values()
         ]
-        result.append({
-            "provider": pid,
-            "label": p.get("name") or PROVIDER_META.get(pid, {}).get("label", pid),
-            "models": models,
-        })
+        result.append(
+            {
+                "provider": pid,
+                "label": p.get("name") or PROVIDER_META.get(pid, {}).get("label", pid),
+                "models": models,
+            }
+        )
     return result
 
 
@@ -71,19 +81,23 @@ async def enabled_models() -> list[dict[str, Any]]:
     cfg = load_config()
     for group in await build_catalog():
         # A provider without its own key or login can't run its models, so none are offered
-        if not _configured(cfg["providers"].get(group["provider"], {}), group["provider"]):
+        if not _configured(
+            cfg["providers"].get(group["provider"], {}), group["provider"]
+        ):
             continue
         for m in group["models"]:
             if m["enabled"]:
-                out.append({
-                    "id": m["id"],
-                    "name": m["name"],
-                    "provider": group["provider"],
-                    "provider_label": group["label"],
-                    "supports_tools": True,
-                    "supports_images": m["supports_images"],
-                    "status": m["status"],
-                })
+                out.append(
+                    {
+                        "id": m["id"],
+                        "name": m["name"],
+                        "provider": group["provider"],
+                        "provider_label": group["label"],
+                        "supports_tools": True,
+                        "supports_images": m["supports_images"],
+                        "status": m["status"],
+                    }
+                )
     return out
 
 
@@ -108,14 +122,18 @@ def is_lasting_failure(message: str) -> bool:
     return bool(_LASTING_FAILURE.search(message))
 
 
-def record_model_status(provider: str, model: str, ok: bool, error: str | None = None, ms: int | None = None) -> None:
+def record_model_status(
+    provider: str, model: str, ok: bool, error: str | None = None, ms: int | None = None
+) -> None:
     """Save the last result for one model; the picker's dot shows it."""
     if not known_provider(provider):
         return
-    statuses = dict(load_config()["providers"].get(provider, {}).get("model_status") or {})
+    statuses = dict(
+        load_config()["providers"].get(provider, {}).get("model_status") or {}
+    )
     statuses[model] = {
         "ok": ok,
-        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checked_at": datetime.now(UTC).isoformat(),
         "error": error,
         "ms": ms,
     }
@@ -124,6 +142,7 @@ def record_model_status(provider: str, model: str, ok: bool, error: str | None =
 
 async def run_model_test(body: dict[str, Any]) -> dict[str, Any]:
     """Send one short prompt through the bridge, then save the result on that model."""
+    result: dict[str, Any]
     try:
         result = await bridge_call("POST", "/models/test", body, timeout=90.0)
     except BridgeError as e:
@@ -132,5 +151,11 @@ async def run_model_test(body: dict[str, Any]) -> dict[str, Any]:
     provider = body.get("provider")
     model = body.get("model")
     if isinstance(provider, str) and isinstance(model, str):
-        record_model_status(provider, model, bool(result.get("ok")), result.get("error"), result.get("ms"))
+        record_model_status(
+            provider,
+            model,
+            bool(result.get("ok")),
+            result.get("error"),
+            result.get("ms"),
+        )
     return result

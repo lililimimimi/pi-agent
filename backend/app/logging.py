@@ -10,14 +10,18 @@ Structured logging with loguru and per-request correlation IDs (contextvars).
 Line format:
     2025-09-05 10:23:45.123 | INFO  | agent.core | cid=a3f2b1c4 | Agent loop started
 """
+
 from __future__ import annotations
 
 import sys
 import uuid
 from contextvars import ContextVar
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger as _base_logger
+
+if TYPE_CHECKING:
+    from loguru import Logger, Record
 
 # --------------------------------------------------------------------------- #
 # Correlation ID (async-safe: each task / request sees its own value)
@@ -56,9 +60,8 @@ class LogContext:
         self._token = _correlation_id.set(self._cid)
         return self._cid
 
-    def __exit__(self, *exc_info: object) -> bool:
+    def __exit__(self, *exc_info: object) -> None:
         _correlation_id.reset(self._token)
-        return False
 
 
 # --------------------------------------------------------------------------- #
@@ -74,7 +77,7 @@ LOG_FORMAT = (
 )
 
 
-def _inject_cid(record: dict) -> None:  # type: ignore[type-arg]
+def _inject_cid(record: Record) -> None:
     record["extra"]["cid"] = get_correlation_id()
 
 
@@ -97,7 +100,7 @@ def setup_logging(level: str = "INFO") -> None:
 configure_logging = setup_logging
 
 
-def get_logger(name: str):  # type: ignore[no-untyped-def]
+def get_logger(name: str) -> Logger:
     """Logger that adds the module name and the current correlation ID to every record."""
-    module = name[4:] if name.startswith("app.") else name
+    module = name.removeprefix("app.")
     return _base_logger.patch(_inject_cid).bind(module=module)

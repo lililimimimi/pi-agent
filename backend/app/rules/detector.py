@@ -3,6 +3,7 @@ StackDetector — works out which technologies a project uses from its manifest 
 
 Only the manifests are read; nothing is executed.
 """
+
 from __future__ import annotations
 
 import json

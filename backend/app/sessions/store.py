@@ -5,27 +5,35 @@ Storage layout:
   ~/.pi/agent/sessions/<uuid>.jsonl
   ~/.pi/agent/projects.json
 """
+
 from __future__ import annotations
 
 import json
 import os
 import uuid
 from pathlib import Path
+from typing import Any
 
+from app.errors import ConflictError, InvalidRequestError, NotFoundError
+from app.logging import get_logger
 from app.sessions.models import (
-    MessageRecord,
     Project,
     SessionMeta,
     SessionRecord,
     SessionSummary,
-    ToolCallRecord,
-    ToolResultRecord,
 )
 
 # ── Defaults ───────────────────────────────────────────────────────────────────
 
-_BASE_DIR = Path(os.getenv("PI_SESSIONS_DIR", Path.home() / ".pi" / "agent" / "sessions"))
-_PROJECTS_FILE = Path(os.getenv("PI_PROJECTS_FILE", Path.home() / ".pi" / "agent" / "projects.json"))
+log = get_logger(__name__)
+
+
+_BASE_DIR = Path(
+    os.getenv("PI_SESSIONS_DIR", Path.home() / ".pi" / "agent" / "sessions")
+)
+_PROJECTS_FILE = Path(
+    os.getenv("PI_PROJECTS_FILE", Path.home() / ".pi" / "agent" / "projects.json")
+)
 
 
 def _sessions_dir() -> Path:
@@ -40,6 +48,7 @@ def _projects_path() -> Path:
 
 # ── Session CRUD ───────────────────────────────────────────────────────────────
 
+
 def create_session(title: str = "", project_id: str = "") -> SessionMeta:
     """Create a new session file with a meta record. Returns the meta."""
     sid = str(uuid.uuid4())
@@ -53,16 +62,44 @@ def append_record(session_id: str, record: SessionRecord) -> None:
     """Append a record (message / tool_call / tool_result) to a session file."""
     path = _sessions_dir() / f"{session_id}.jsonl"
     if not path.exists():
-        raise FileNotFoundError(f"Session '{session_id}' not found")
+        raise NotFoundError(f"Session '{session_id}' not found")
     with path.open("a", encoding="utf-8") as f:
         f.write(record.model_dump_json() + "\n")
+
+
+def truncate_before_user_message(session_id: str, user_index: int) -> None:
+    """Cut the session file just before its Nth user message (0-based), removing it and all later rows.
+
+    Used by edit-and-resend and regenerate: the caller then sends that message again, which appends it back.
+    Raises ConflictError for a Pi-native session (kept in Pi's format, which this app does not rewrite)
+    or for a user message that is not there, so the file is never cut at the wrong place.
+    """
+    path = _sessions_dir() / f"{session_id}.jsonl"
+    if not path.exists():
+        if session_file(session_id) is not None:
+            raise ConflictError(
+                "This chat is saved in Pi's own format, so it cannot be edited here. "
+                "Start a new chat to change it."
+            )
+        raise NotFoundError(f"Session '{session_id}' not found")
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    seen = 0
+    for i, line in enumerate(lines):
+        if i == 0 or not line.strip():  # first line is the meta record
+            continue
+        if json.loads(line).get("role") == "user":
+            if seen == user_index:
+                path.write_text("".join(lines[:i]), encoding="utf-8")
+                return
+            seen += 1
+    raise ConflictError(f"Session '{session_id}' has no user message #{user_index}")
 
 
 def update_title(session_id: str, title: str) -> None:
     """Update the title in the meta (first line) of a session file."""
     path = _sessions_dir() / f"{session_id}.jsonl"
     if not path.exists():
-        raise FileNotFoundError(f"Session '{session_id}' not found")
+        raise NotFoundError(f"Session '{session_id}' not found")
     lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
     if not lines:
         return
@@ -75,7 +112,7 @@ def update_title(session_id: str, title: str) -> None:
 # ── Pi native session helpers ──────────────────────────────────────────────────
 
 
-def _extract_pi_text(content) -> str:
+def _extract_pi_text(content: Any) -> str:
     """Extract plain text from Pi native content array or string."""
     if isinstance(content, str):
         return content
@@ -143,7 +180,7 @@ def _parse_pi_native_summary(path: Path) -> SessionSummary | None:
             if second.get("type") == "session_info":
                 title = second.get("name", "") or ""
         except json.JSONDecodeError:
-            pass
+            log.warning("pi session {} has an unreadable title line", path.name)
 
     # If title is still empty, use first user message (up to 20 chars)
     if not title:
@@ -187,12 +224,14 @@ def list_sessions() -> list[SessionSummary]:
             meta = json.loads(first_line)
             if meta.get("type") != "meta":
                 continue
-            summaries.append(SessionSummary(
-                id=meta["id"],
-                title=meta.get("title", ""),
-                project_id=meta.get("project_id", ""),
-                created_at=meta.get("created_at", ""),
-            ))
+            summaries.append(
+                SessionSummary(
+                    id=meta["id"],
+                    title=meta.get("title", ""),
+                    project_id=meta.get("project_id", ""),
+                    created_at=meta.get("created_at", ""),
+                )
+            )
         except (json.JSONDecodeError, KeyError):
             continue
 
@@ -220,7 +259,7 @@ def session_file(session_id: str) -> Path | None:
     return _find_pi_native_session(session_id)
 
 
-def get_session(session_id: str) -> list[dict]:
+def get_session(session_id: str) -> list[dict[str, Any]]:
     """Read all records from a session file. Returns list of raw dicts.
 
     Checks our own format first, then falls back to Pi native format.
@@ -228,7 +267,7 @@ def get_session(session_id: str) -> list[dict]:
     # Our own format
     path = _sessions_dir() / f"{session_id}.jsonl"
     if path.exists():
-        records: list[dict] = []
+        records: list[dict[str, Any]] = []
         for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line:
@@ -239,7 +278,7 @@ def get_session(session_id: str) -> list[dict]:
     # Pi native format
     pi_path = _find_pi_native_session(session_id)
     if pi_path is None:
-        raise FileNotFoundError(f"Session '{session_id}' not found")
+        raise NotFoundError(f"Session '{session_id}' not found")
 
     _SKIP_TYPES = {"session", "session_info", "model_change", "thinking_level_change"}
     records = []
@@ -262,11 +301,13 @@ def get_session(session_id: str) -> list[dict]:
             if role == "toolResult":
                 continue
             text = _extract_pi_text(msg.get("content", ""))
-            records.append({
-                "type": "message",
-                "role": role,
-                "content": text,
-            })
+            records.append(
+                {
+                    "type": "message",
+                    "role": role,
+                    "content": text,
+                }
+            )
 
     return records
 
@@ -291,32 +332,38 @@ def bulk_delete_sessions(session_ids: list[str]) -> dict[str, str]:
         try:
             delete_session(sid)
             results[sid] = "ok"
-        except Exception:
+        except OSError:
             results[sid] = "error"
     return results
 
 
 # ── Project CRUD ───────────────────────────────────────────────────────────────
 
-def _load_projects() -> list[dict]:
+
+def _load_projects() -> list[dict[str, Any]]:
     path = _projects_path()
     if not path.exists():
         return []
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data: list[dict[str, Any]] = json.loads(path.read_text(encoding="utf-8"))
+        return data
     except (json.JSONDecodeError, ValueError):
         return []
 
 
-def _save_projects(projects: list[dict]) -> None:
+def _save_projects(projects: list[dict[str, Any]]) -> None:
     path = _projects_path()
-    path.write_text(json.dumps(projects, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(projects, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 def create_project(name: str, dir_path: str) -> Project:
     """Create a project. Validates that dir_path exists."""
     if not os.path.isdir(dir_path):
-        raise NotADirectoryError(f"Path does not exist or is not a directory: {dir_path}")
+        raise InvalidRequestError(
+            f"Path does not exist or is not a directory: {dir_path}"
+        )
     projects = _load_projects()
     project = Project(id=str(uuid.uuid4()), name=name, path=dir_path)
     projects.append(project.model_dump())
@@ -332,14 +379,14 @@ def get_project(project_id: str) -> Project:
     for p in _load_projects():
         if p["id"] == project_id:
             return Project(**p)
-    raise FileNotFoundError(f"Project '{project_id}' not found")
+    raise NotFoundError(f"Project '{project_id}' not found")
 
 
 def delete_project(project_id: str) -> None:
     projects = _load_projects()
     filtered = [p for p in projects if p["id"] != project_id]
     if len(filtered) == len(projects):
-        raise FileNotFoundError(f"Project '{project_id}' not found")
+        raise NotFoundError(f"Project '{project_id}' not found")
     _save_projects(filtered)
 
 
@@ -372,9 +419,6 @@ def delete_project_sessions(project_path: str) -> int:
         for f in native_dir.glob("*.jsonl"):
             f.unlink()
             removed += 1
-        try:
-            native_dir.rmdir()  # only removes it when empty
-        except OSError:
-            pass
+        if not any(native_dir.iterdir()):
+            native_dir.rmdir()
     return removed
-

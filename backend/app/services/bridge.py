@@ -1,4 +1,5 @@
 """Client for pi-bridge, the Node service that runs the Pi SDK."""
+
 from __future__ import annotations
 
 import os
@@ -6,10 +7,12 @@ from typing import Any
 
 import httpx
 
+from app.errors import UpstreamError
+
 BRIDGE_URL = os.getenv("PI_BRIDGE_URL", "http://localhost:3100")
 
 
-class BridgeError(Exception):
+class BridgeError(UpstreamError):
     """pi-bridge is unreachable, or its reply could not be read."""
 
 

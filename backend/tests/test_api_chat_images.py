@@ -3,6 +3,7 @@ Tests for image attachments on /api/chat.
 
 The bridge is replaced with a fake httpx client that records the request body.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -18,7 +19,10 @@ PNG_B64 = "iVBORw0KGgo="
 @pytest.fixture
 async def client():
     from app.main import app
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as c:
         yield c
 
 
@@ -54,7 +58,9 @@ def _fake_bridge(captured: dict) -> AsyncMock:
     return client
 
 
-def _image_message(text: str = "what is this?", media_type: str = "image/png", data: str = PNG_B64) -> dict:
+def _image_message(
+    text: str = "what is this?", media_type: str = "image/png", data: str = PNG_B64
+) -> dict:
     return {
         "role": "user",
         "content": [
@@ -67,7 +73,11 @@ def _image_message(text: str = "what is this?", media_type: str = "image/png", d
 async def _create(client: AsyncClient, messages: list[dict]):
     return await client.post(
         "/api/chat",
-        json={"messages": messages, "provider": "anthropic", "model": "claude-sonnet-4-5"},
+        json={
+            "messages": messages,
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-5",
+        },
     )
 
 
@@ -77,7 +87,10 @@ async def test_image_is_forwarded_to_bridge_unchanged(client: AsyncClient):
     session_id = r.json()["session_id"]
 
     captured: dict = {}
-    with patch("app.api.chat.httpx.AsyncClient", return_value=_fake_bridge(captured)):
+    with patch(
+        "app.services.chat_stream.httpx.AsyncClient",
+        return_value=_fake_bridge(captured),
+    ):
         await client.get(f"/api/chat/stream/{session_id}")
 
     content = captured["json"]["messages"][0]["content"]
@@ -92,13 +105,18 @@ async def test_text_only_message_is_forwarded_as_string(client: AsyncClient):
     session_id = r.json()["session_id"]
 
     captured: dict = {}
-    with patch("app.api.chat.httpx.AsyncClient", return_value=_fake_bridge(captured)):
+    with patch(
+        "app.services.chat_stream.httpx.AsyncClient",
+        return_value=_fake_bridge(captured),
+    ):
         await client.get(f"/api/chat/stream/{session_id}")
 
     assert captured["json"]["messages"][0]["content"] == "hello"
 
 
-async def test_session_file_records_text_and_image_count_not_base64(client: AsyncClient):
+async def test_session_file_records_text_and_image_count_not_base64(
+    client: AsyncClient,
+):
     r = await _create(client, [_image_message("describe it")])
     persist_id = r.json()["persist_id"]
 
@@ -111,7 +129,7 @@ async def test_session_file_records_text_and_image_count_not_base64(client: Asyn
 async def test_unsupported_media_type_returns_400(client: AsyncClient):
     r = await _create(client, [_image_message(media_type="image/svg+xml")])
     assert r.status_code == 400
-    assert "Unsupported image type" in r.json()["detail"]
+    assert "Unsupported image type" in r.json()["error"]["message"]
 
 
 async def test_image_over_5mb_returns_400(client: AsyncClient):
@@ -119,7 +137,7 @@ async def test_image_over_5mb_returns_400(client: AsyncClient):
     too_big = "A" * (7 * 1024 * 1024)
     r = await _create(client, [_image_message(data=too_big)])
     assert r.status_code == 400
-    assert "5MB" in r.json()["detail"]
+    assert "5MB" in r.json()["error"]["message"]
 
 
 async def test_multiple_images_are_forwarded_in_order(client: AsyncClient):
@@ -135,7 +153,10 @@ async def test_multiple_images_are_forwarded_in_order(client: AsyncClient):
     session_id = r.json()["session_id"]
 
     captured: dict = {}
-    with patch("app.api.chat.httpx.AsyncClient", return_value=_fake_bridge(captured)):
+    with patch(
+        "app.services.chat_stream.httpx.AsyncClient",
+        return_value=_fake_bridge(captured),
+    ):
         await client.get(f"/api/chat/stream/{session_id}")
 
     content = captured["json"]["messages"][0]["content"]
@@ -145,10 +166,13 @@ async def test_multiple_images_are_forwarded_in_order(client: AsyncClient):
 
 async def test_more_than_four_images_returns_400(client: AsyncClient):
     parts = [{"type": "text", "text": "x"}]
-    parts += [{"type": "image", "image": {"media_type": "image/png", "data": PNG_B64}} for _ in range(5)]
+    parts += [
+        {"type": "image", "image": {"media_type": "image/png", "data": PNG_B64}}
+        for _ in range(5)
+    ]
     r = await _create(client, [{"role": "user", "content": parts}])
     assert r.status_code == 400
-    assert "4 images" in r.json()["detail"]
+    assert "4 images" in r.json()["error"]["message"]
 
 
 async def test_image_part_without_data_returns_400(client: AsyncClient):
@@ -169,8 +193,10 @@ async def test_bridge_error_status_is_reported_to_the_browser(client: AsyncClien
             return b"<html>PayloadTooLargeError</html>"
 
     client_mock = _fake_bridge({})
-    client_mock.stream = MagicMock(side_effect=lambda *a, **k: _FakeStream(_ErrorResponse()))
-    with patch("app.api.chat.httpx.AsyncClient", return_value=client_mock):
+    client_mock.stream = MagicMock(
+        side_effect=lambda *a, **k: _FakeStream(_ErrorResponse())
+    )
+    with patch("app.services.chat_stream.httpx.AsyncClient", return_value=client_mock):
         r = await client.get(f"/api/chat/stream/{session_id}")
 
     assert '"event": "error"' in r.text or '"event":"error"' in r.text
@@ -183,19 +209,24 @@ async def test_existing_session_does_not_repeat_its_history(client: AsyncClient)
     first = await _create(client, [{"role": "user", "content": "one"}])
     persist_id = first.json()["persist_id"]
 
-    second = await client.post("/api/chat", json={
-        "messages": [
-            {"role": "user", "content": "one"},
-            {"role": "assistant", "content": "reply"},
-            {"role": "user", "content": "two"},
-        ],
-        "provider": "anthropic",
-        "model": "claude-sonnet-4-5",
-        "persist_id": persist_id,
-    })
+    second = await client.post(
+        "/api/chat",
+        json={
+            "messages": [
+                {"role": "user", "content": "one"},
+                {"role": "assistant", "content": "reply"},
+                {"role": "user", "content": "two"},
+            ],
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-5",
+            "persist_id": persist_id,
+        },
+    )
     assert second.status_code == 200
 
-    records = [r for r in session_store.get_session(persist_id) if r.get("type") == "message"]
+    records = [
+        r for r in session_store.get_session(persist_id) if r.get("type") == "message"
+    ]
     assert [r["content"] for r in records] == ["one", "two"]
 
 
@@ -210,9 +241,17 @@ async def test_failed_turn_is_saved_so_the_error_survives_a_reload(client: Async
             yield 'data: {"event": "error", "data": {"message": "out of extra usage"}}'
 
     client_mock = _fake_bridge({})
-    client_mock.stream = MagicMock(side_effect=lambda *a, **k: _FakeStream(_ErrorLine()))
-    with patch("app.api.chat.httpx.AsyncClient", return_value=client_mock):
+    client_mock.stream = MagicMock(
+        side_effect=lambda *a, **k: _FakeStream(_ErrorLine())
+    )
+    with patch("app.services.chat_stream.httpx.AsyncClient", return_value=client_mock):
         await client.get(f"/api/chat/stream/{session_id}")
 
-    records = [r for r in session_store.get_session(persist_id) if r.get("type") == "message"]
-    assert records[-1] == {"type": "message", "role": "assistant", "content": "Error: out of extra usage"}
+    records = [
+        r for r in session_store.get_session(persist_id) if r.get("type") == "message"
+    ]
+    assert records[-1] == {
+        "type": "message",
+        "role": "assistant",
+        "content": "Error: out of extra usage",
+    }

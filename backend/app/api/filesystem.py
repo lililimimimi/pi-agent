@@ -3,13 +3,15 @@ Filesystem browsing API for project directory selection.
 
 GET /api/filesystem/browse?path=<dir>&show_hidden=false  → list subdirectories
 """
+
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
+
+from app.errors import InvalidRequestError
 
 router = APIRouter(prefix="/api/filesystem", tags=["filesystem"])
 
@@ -44,9 +46,9 @@ async def browse_directory(
     target = target.resolve()
 
     if not target.exists():
-        raise HTTPException(status_code=400, detail=f"Path does not exist: {target}")
+        raise InvalidRequestError(f"Path does not exist: {target}")
     if not target.is_dir():
-        raise HTTPException(status_code=400, detail=f"Path is not a directory: {target}")
+        raise InvalidRequestError(f"Path is not a directory: {target}")
 
     dirs: list[DirEntry] = []
     try:
@@ -57,7 +59,7 @@ async def browse_directory(
                 continue
             dirs.append(DirEntry(name=entry.name, path=str(entry)))
     except PermissionError:
-        raise HTTPException(status_code=400, detail=f"Permission denied: {target}")
+        raise InvalidRequestError(f"Permission denied: {target}")
 
     parent = str(target.parent) if target.parent != target else None
 
@@ -69,15 +71,15 @@ async def make_directory(req: MkdirRequest) -> MkdirResponse:
     """Create a new subdirectory inside parent."""
     parent = Path(req.parent).expanduser().resolve()
     if not parent.exists() or not parent.is_dir():
-        raise HTTPException(status_code=400, detail=f"Parent does not exist: {parent}")
+        raise InvalidRequestError(f"Parent does not exist: {parent}")
     name = req.name.strip()
-    if not name or '/' in name or name in ('.', '..'):
-        raise HTTPException(status_code=400, detail="Invalid directory name")
+    if not name or "/" in name or name in (".", ".."):
+        raise InvalidRequestError("Invalid directory name")
     new_dir = parent / name
     if new_dir.exists():
-        raise HTTPException(status_code=400, detail=f"'{name}' already exists")
+        raise InvalidRequestError(f"'{name}' already exists")
     try:
         new_dir.mkdir(parents=False)
     except PermissionError:
-        raise HTTPException(status_code=400, detail="Permission denied")
+        raise InvalidRequestError("Permission denied")
     return MkdirResponse(path=str(new_dir))
