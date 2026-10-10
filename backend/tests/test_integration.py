@@ -89,7 +89,7 @@ def _make_mock_bridge(fake_lines: list[str]):
     return mock_client_instance
 
 
-async def test_tool_execution_flow(client: AsyncClient):
+async def test_tool_execution_flow_emits_call_then_result(client: AsyncClient):
     """Full flow via bridge proxy: tool_call + tool_result + done events."""
     r = await client.post(
         "/api/chat",

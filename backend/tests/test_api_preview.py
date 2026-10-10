@@ -36,7 +36,7 @@ def _mock_httpx(status_code: int = 200) -> AsyncMock:
     return client
 
 
-async def test_confirm_forwards_to_bridge(client: AsyncClient):
+async def test_confirm_preview_forwards_to_bridge(client: AsyncClient):
     fake = _mock_httpx(200)
     with patch("app.api.preview.httpx.AsyncClient", return_value=fake):
         r = await client.post("/api/preview/pv-1/confirm")
@@ -46,7 +46,7 @@ async def test_confirm_forwards_to_bridge(client: AsyncClient):
     fake.post.assert_awaited_once_with("http://localhost:3100/preview/pv-1/confirm")
 
 
-async def test_cancel_forwards_to_bridge(client: AsyncClient):
+async def test_cancel_preview_forwards_to_bridge(client: AsyncClient):
     fake = _mock_httpx(200)
     with patch("app.api.preview.httpx.AsyncClient", return_value=fake):
         r = await client.post("/api/preview/pv-2/cancel")

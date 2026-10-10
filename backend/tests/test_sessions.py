@@ -76,7 +76,7 @@ class TestSessionStore:
         assert records[1]["content"] == "hi"
         assert records[2]["content"] == "hello"
 
-    def test_delete_session(self):
+    def test_delete_session_removes_its_file(self):
         meta = store.create_session(title="to-delete")
         store.delete_session(meta.id)
         assert len(store.list_sessions()) == 0
@@ -87,13 +87,13 @@ class TestSessionStore:
                 "nonexistent-id", MessageRecord(role="user", content="x")
             )
 
-    def test_update_title(self):
+    def test_update_title_saves_it_in_file(self):
         meta = store.create_session(title="old")
         store.update_title(meta.id, "new title")
         records = store.get_session(meta.id)
         assert records[0]["title"] == "new title"
 
-    def test_jsonl_format_is_valid(self):
+    def test_session_file_is_valid_jsonl(self):
         """Each line in the session file is valid JSON."""
         meta = store.create_session(title="format-test")
         store.append_record(meta.id, MessageRecord(role="user", content="test msg"))
@@ -122,7 +122,7 @@ class TestProjectStore:
         with pytest.raises(InvalidRequestError):
             store.create_project(name="bad", dir_path="/nonexistent/path/xyz")
 
-    def test_list_projects(self, tmp_path):
+    def test_list_projects_returns_saved_projects(self, tmp_path):
         d1 = tmp_path / "p1"
         d1.mkdir()
         d2 = tmp_path / "p2"
@@ -132,7 +132,7 @@ class TestProjectStore:
         projects = store.list_projects()
         assert len(projects) == 2
 
-    def test_delete_project(self, tmp_path):
+    def test_delete_project_removes_it_from_list(self, tmp_path):
         d = tmp_path / "del-me"
         d.mkdir()
         project = store.create_project("del-me", str(d))
@@ -150,7 +150,7 @@ class TestProjectStore:
 
 
 class TestSessionAPI:
-    async def test_create_and_list(self, client: AsyncClient):
+    async def test_create_session_then_list_includes_it(self, client: AsyncClient):
         r = await client.post("/api/sessions", json={"title": "api test"})
         assert r.status_code == 200
         data = r.json()
@@ -161,7 +161,7 @@ class TestSessionAPI:
         sessions = r2.json()
         assert any(s["id"] == data["id"] for s in sessions)
 
-    async def test_get_session(self, client: AsyncClient):
+    async def test_get_session_returns_its_records(self, client: AsyncClient):
         r = await client.post("/api/sessions", json={"title": "detail"})
         sid = r.json()["id"]
         r2 = await client.get(f"/api/sessions/{sid}")
@@ -169,7 +169,7 @@ class TestSessionAPI:
         records = r2.json()
         assert records[0]["type"] == "meta"
 
-    async def test_delete_session(self, client: AsyncClient):
+    async def test_delete_session_removes_its_file(self, client: AsyncClient):
         r = await client.post("/api/sessions", json={"title": "to-del"})
         sid = r.json()["id"]
         r2 = await client.delete(f"/api/sessions/{sid}")
@@ -181,18 +181,22 @@ class TestSessionAPI:
 
 
 class TestProjectAPI:
-    async def test_create_with_valid_path(self, client: AsyncClient, tmp_path):
+    async def test_create_project_valid_path_is_saved(
+        self, client: AsyncClient, tmp_path
+    ):
         d = tmp_path / "proj"
         d.mkdir()
         r = await client.post("/api/projects", json={"path": str(d)})
         assert r.status_code == 200
         assert r.json()["name"] == "proj"  # auto-derived from path
 
-    async def test_create_with_invalid_path(self, client: AsyncClient):
+    async def test_create_project_invalid_path_is_refused(self, client: AsyncClient):
         r = await client.post("/api/projects", json={"path": "/nonexistent/xyz"})
         assert r.status_code == 400
 
-    async def test_list_projects(self, client: AsyncClient, tmp_path):
+    async def test_list_projects_returns_saved_projects(
+        self, client: AsyncClient, tmp_path
+    ):
         d = tmp_path / "lp"
         d.mkdir()
         await client.post("/api/projects", json={"path": str(d), "name": "lp"})
@@ -200,7 +204,9 @@ class TestProjectAPI:
         assert r.status_code == 200
         assert len(r.json()) >= 1
 
-    async def test_delete_project(self, client: AsyncClient, tmp_path):
+    async def test_delete_project_removes_it_from_list(
+        self, client: AsyncClient, tmp_path
+    ):
         d = tmp_path / "dp"
         d.mkdir()
         r = await client.post("/api/projects", json={"path": str(d)})
@@ -335,7 +341,7 @@ class TestPiNativeCompat:
         assert len(pi_sessions) == 1
         assert len(pi_sessions[0].title) <= 20
 
-    def test_get_pi_native_session(self):
+    def test_get_pi_native_session_returns_records(self):
         self._create_pi_session(None, "pi-sess-003", "Get Test", "help me")
         records = store.get_session("pi-sess-003")
         # Should have user + assistant messages, skip toolResult and meta types
@@ -362,7 +368,7 @@ class TestPiNativeCompat:
 class TestTitleTruncation:
     """Title should be first 20 chars of user's first message."""
 
-    async def test_auto_title_from_chat(self, client: AsyncClient):
+    async def test_create_chat_first_message_sets_title(self, client: AsyncClient):
         long_msg = "这是一条很长的消息用来测试标题截取功能是否正常工作"
         r = await client.post(
             "/api/chat",

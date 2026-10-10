@@ -47,7 +47,7 @@ def test_mask_key_normal():
     assert "api03" not in result
 
 
-def test_load_config_default(tmp_path: Path, monkeypatch):
+def test_load_config_without_file_returns_defaults(tmp_path: Path, monkeypatch):
     """load_config should return defaults for all 5 providers when no file exists."""
     from app.config import store as pmod
 
@@ -63,7 +63,7 @@ def test_load_config_default(tmp_path: Path, monkeypatch):
         assert pid in cfg["providers"], f"Missing default for {pid}"
 
 
-def test_save_and_load_config(tmp_path: Path, monkeypatch):
+def test_config_round_trips_through_file(tmp_path: Path, monkeypatch):
     """save_config + load_config roundtrip."""
     from app.config import store as pmod
 
@@ -82,7 +82,7 @@ def test_save_and_load_config(tmp_path: Path, monkeypatch):
     assert cfg2["providers"]["anthropic"]["enabled"] is True
 
 
-def test_update_provider_config(tmp_path: Path, monkeypatch):
+def test_update_provider_writes_config_file(tmp_path: Path, monkeypatch):
     from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
@@ -175,29 +175,31 @@ def test_list_providers_masks_keys(client: TestClient, tmp_path: Path, monkeypat
     assert "real-secret" not in ds["api_key"]
 
 
-def test_update_provider_api_key(client: TestClient):
+def test_update_provider_stores_api_key(client: TestClient):
     resp = client.put("/api/providers/anthropic", json={"api_key": "sk-ant-newkey"})
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
 
 
-def test_update_provider_enabled(client: TestClient):
+def test_update_provider_toggles_enabled(client: TestClient):
     resp = client.put("/api/providers/openai", json={"enabled": True})
     assert resp.status_code == 200
 
 
-def test_update_unknown_provider(client: TestClient):
+def test_update_unknown_provider_is_refused(client: TestClient):
     resp = client.put("/api/providers/unknown-xyz", json={"api_key": "x"})
     assert resp.status_code == 404
 
 
-def test_get_models_empty(client: TestClient):
+def test_get_models_without_providers_returns_empty_list(client: TestClient):
     resp = client.get("/api/providers/anthropic/models")
     assert resp.status_code == 200
     assert resp.json() == []
 
 
-def test_get_models_with_cache(client: TestClient, tmp_path: Path, monkeypatch):
+def test_get_models_with_saved_cache_returns_cached_list(
+    client: TestClient, tmp_path: Path, monkeypatch
+):
     from app.config import store as pmod
 
     cfg_file = tmp_path / ".pi" / "agent" / "config.json"
@@ -339,6 +341,6 @@ def test_test_provider_http_error(client: TestClient, tmp_path: Path, monkeypatc
     assert "403" in (data.get("error") or "")
 
 
-def test_test_unknown_provider(client: TestClient):
+def test_test_unknown_provider_is_refused(client: TestClient):
     resp = client.post("/api/providers/unknown-xyz/test")
     assert resp.status_code == 404
