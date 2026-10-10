@@ -1,18 +1,13 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react"
-import type { ReactNode } from "react"
-import { Info, CheckCircle, AlertCircle, AlertTriangle, X } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { ToastContext } from '@/components/useToast'
+import { Info, CheckCircle, AlertCircle, AlertTriangle, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { APP_ERROR_EVENT, type AppErrorDetail } from '@/lib/appError'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ToastType = "info" | "success" | "error" | "warning"
+type ToastType = 'info' | 'success' | 'error' | 'warning'
 
 interface ToastItem {
   id: string
@@ -23,29 +18,13 @@ interface ToastItem {
   onRetry?: () => void
 }
 
-interface ShowToastOptions {
+export interface ShowToastOptions {
   type: ToastType
   message: string
   /** Optional small line under the message, e.g. the raw error text */
   detail?: string
   duration?: number
   onRetry?: () => void
-}
-
-interface ToastContextValue {
-  showToast: (options: ShowToastOptions) => void
-}
-
-// ─── Context ─────────────────────────────────────────────────────────────────
-
-const ToastContext = createContext<ToastContextValue | null>(null)
-
-export function useToast(): ToastContextValue {
-  const ctx = useContext(ToastContext)
-  if (!ctx) {
-    throw new Error("useToast must be used within a <ToastProvider>")
-  }
-  return ctx
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -60,17 +39,17 @@ const ICON_MAP: Record<ToastType, typeof Info> = {
 }
 
 const COLOR_MAP: Record<ToastType, string> = {
-  info: "text-blue-500",
-  success: "text-green-500",
-  error: "text-red-500",
-  warning: "text-yellow-500",
+  info: 'text-blue-500',
+  success: 'text-green-500',
+  error: 'text-red-500',
+  warning: 'text-yellow-500',
 }
 
 const BG_MAP: Record<ToastType, string> = {
-  info: "bg-blue-50/80 border-blue-200/60",
-  success: "bg-green-50/80 border-green-200/60",
-  error: "bg-red-50/80 border-red-200/60",
-  warning: "bg-yellow-50/80 border-yellow-200/60",
+  info: 'bg-blue-50/80 border-blue-200/60',
+  success: 'bg-green-50/80 border-green-200/60',
+  error: 'bg-red-50/80 border-red-200/60',
+  warning: 'bg-yellow-50/80 border-yellow-200/60',
 }
 
 // ─── Single Toast ────────────────────────────────────────────────────────────
@@ -113,19 +92,15 @@ function Toast({ toast, onDismiss }: ToastProps) {
       role="alert"
       onClick={dismiss}
       className={cn(
-        "pointer-events-auto flex w-full max-w-[480px] cursor-pointer items-center gap-4 rounded-2xl border px-5 py-4 shadow-lg backdrop-blur-md transition-all duration-300 ease-out",
+        'pointer-events-auto flex w-full max-w-[480px] cursor-pointer items-center gap-4 rounded-2xl border px-5 py-4 shadow-lg backdrop-blur-md transition-all duration-300 ease-out',
         BG_MAP[toast.type],
-        visible && !exiting
-          ? "translate-y-0 opacity-100"
-          : "-translate-y-4 opacity-0",
+        visible && !exiting ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0',
       )}
     >
-      <Icon className={cn("size-5 shrink-0", COLOR_MAP[toast.type])} />
+      <Icon className={cn('size-5 shrink-0', COLOR_MAP[toast.type])} />
 
       <div className="min-w-0 flex-1">
-        <p className="text-base font-medium leading-snug text-gray-900">
-          {toast.message}
-        </p>
+        <p className="text-base font-medium leading-snug text-gray-900">{toast.message}</p>
         {toast.detail && (
           <p className="mt-1 line-clamp-2 break-all text-xs text-gray-500" title={toast.detail}>
             {toast.detail}
@@ -133,7 +108,7 @@ function Toast({ toast, onDismiss }: ToastProps) {
         )}
       </div>
 
-      {toast.type === "error" && toast.onRetry && (
+      {toast.type === 'error' && toast.onRetry && (
         <button
           type="button"
           onClick={(e) => {
@@ -164,13 +139,7 @@ function Toast({ toast, onDismiss }: ToastProps) {
 
 // ─── Toast Container ─────────────────────────────────────────────────────────
 
-function ToastContainer({
-  toasts,
-  onDismiss,
-}: {
-  toasts: ToastItem[]
-  onDismiss: (id: string) => void
-}) {
+function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: string) => void }) {
   if (toasts.length === 0) return null
 
   return (
@@ -205,6 +174,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
+
+  // Errors reported from stores and helpers (see lib/appError) show as toasts too
+  useEffect(() => {
+    const onAppError = (event: Event) => {
+      const { message, detail } = (event as CustomEvent<AppErrorDetail>).detail
+      showToast({ type: 'error', message, detail })
+    }
+    window.addEventListener(APP_ERROR_EVENT, onAppError)
+    return () => window.removeEventListener(APP_ERROR_EVENT, onAppError)
+  }, [showToast])
 
   return (
     <ToastContext.Provider value={{ showToast }}>

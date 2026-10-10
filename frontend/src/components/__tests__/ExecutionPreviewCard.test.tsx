@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { ExecutionPreviewCard } from '@/components/chat/ExecutionPreviewCard'
-import * as api from '@/services/api'
+import * as api from '@/services/api/chat'
 
 // Stub the API calls so no real fetch happens
-vi.mock('@/services/api', () => ({
+vi.mock('@/services/api/chat', () => ({
   confirmPreview: vi.fn().mockResolvedValue(undefined),
   cancelPreview: vi.fn().mockResolvedValue(undefined),
 }))
@@ -16,7 +16,7 @@ const mockPreview = {
 }
 
 describe('ExecutionPreviewCard', () => {
-  let onDone: ReturnType<typeof vi.fn>
+  let onDone: Mock<() => void>
 
   beforeEach(() => {
     onDone = vi.fn()
@@ -44,8 +44,18 @@ describe('ExecutionPreviewCard', () => {
     await waitFor(() => expect(onDone).toHaveBeenCalled())
   })
 
-  it('shows a countdown timer starting at 60', () => {
-    render(<ExecutionPreviewCard preview={mockPreview} onDone={onDone} />)
-    expect(screen.getByText('60s')).toBeInTheDocument()
+  it('shows no countdown and does not cancel on its own', () => {
+    vi.useFakeTimers()
+    try {
+      render(<ExecutionPreviewCard preview={mockPreview} onDone={onDone} />)
+      act(() => {
+        vi.advanceTimersByTime(10 * 60_000)
+      })
+      expect(api.cancelPreview).not.toHaveBeenCalled()
+      expect(onDone).not.toHaveBeenCalled()
+      expect(screen.queryByText(/^\d+s$/)).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

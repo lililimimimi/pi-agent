@@ -3,7 +3,11 @@ import { newSessionPatch, removeSessionsPatch, makeSession, type SessionState } 
 
 const zero = { inputTokens: 0, outputTokens: 0 }
 
-function session(id: string, messages = [] as SessionState['messages'], backendSessionId: string | null = null) {
+function session(
+  id: string,
+  messages = [] as SessionState['messages'],
+  backendSessionId: string | null = null,
+) {
   return { ...makeSession('p1'), id, title: id, messages, backendSessionId }
 }
 
@@ -34,7 +38,10 @@ describe('newSessionPatch', () => {
 
 describe('removeSessionsPatch', () => {
   it('opens the last remaining session when the open one is removed', () => {
-    const state = stateWith([session('a'), session('b', [{ id: 'x', role: 'user', content: 'old' }], 'b-backend')], 'a')
+    const state = stateWith(
+      [session('a'), session('b', [{ id: 'x', role: 'user', content: 'old' }], 'b-backend')],
+      'a',
+    )
     const patch = removeSessionsPatch(state, new Set(['a']))
     expect(patch.activeId).toBe('b')
     expect(patch.messages).toEqual([{ id: 'x', role: 'user', content: 'old' }])

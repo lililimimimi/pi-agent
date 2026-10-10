@@ -21,8 +21,9 @@ describe('parseResponse', () => {
   })
 
   it('reports where the shape is wrong, in plain words', () => {
-    expect(() => parseResponse(ModelSchema, { ...validModel, supports_images: 'yes' }, 'GET /api/models'))
-      .toThrow(/Unexpected response from GET \/api\/models: supports_images/)
+    expect(() =>
+      parseResponse(ModelSchema, { ...validModel, supports_images: 'yes' }, 'GET /api/models'),
+    ).toThrow(/Unexpected response from GET \/api\/models: supports_images/)
   })
 
   it('rejects a catalog whose model list is missing', () => {

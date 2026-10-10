@@ -5,9 +5,7 @@ import { ChatView } from '@/components/chat/ChatView'
 import { ToastProvider } from '@/components/Toast'
 import { useChatStore } from '@/stores/chatStore'
 
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <ToastProvider>{children}</ToastProvider>
-)
+const wrapper = ({ children }: { children: ReactNode }) => <ToastProvider>{children}</ToastProvider>
 
 // Mock scrollIntoView
 beforeEach(() => {

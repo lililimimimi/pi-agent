@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
-  addProjectPatch, makeSession, matchRemoteSessions, removeProjectPatch, switchProjectPatch,
-  switchSessionPatch, type ProjectState,
+  addProjectPatch,
+  makeSession,
+  matchRemoteSessions,
+  removeProjectPatch,
+  switchProjectPatch,
+  switchSessionPatch,
+  type ProjectState,
 } from '../sessionPatch'
 import type { Project } from '../chatStore'
 
@@ -11,7 +16,12 @@ function session(id: string, projectId: string, extra: Partial<ReturnType<typeof
   return { ...makeSession(projectId), id, title: id, ...extra }
 }
 
-function stateWith(projects: Project[], sessions: ReturnType<typeof session>[], activeProjectId: string, activeId: string): ProjectState {
+function stateWith(
+  projects: Project[],
+  sessions: ReturnType<typeof session>[],
+  activeProjectId: string,
+  activeId: string,
+): ProjectState {
   return {
     projects,
     sessions,
@@ -39,7 +49,12 @@ describe('addProjectPatch', () => {
 
 describe('switchProjectPatch', () => {
   it('opens the last session of the target project', () => {
-    const state = stateWith([P1, P2], [session('s1', 'p1'), session('s2', 'p2', { backendSessionId: 'b2' })], 'p1', 's1')
+    const state = stateWith(
+      [P1, P2],
+      [session('s1', 'p1'), session('s2', 'p2', { backendSessionId: 'b2' })],
+      'p1',
+      's1',
+    )
     const patch = switchProjectPatch(state, 'p2')
     expect(patch.activeProjectId).toBe('p2')
     expect(patch.activeId).toBe('s2')

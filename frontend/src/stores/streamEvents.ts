@@ -42,7 +42,11 @@ export function streamEventPatch(state: StreamState, event: SSEEventData): Strea
       }
 
     case 'tool_call': {
-      const tc: ToolCall = { toolCallId: event.data.tool_call_id, toolName: event.data.tool_name, arguments: event.data.arguments }
+      const tc: ToolCall = {
+        toolCallId: event.data.tool_call_id,
+        toolName: event.data.tool_name,
+        arguments: event.data.arguments,
+      }
       return {
         messages: changeLast(state.messages, (m) => ({ ...m, toolCalls: [...(m.toolCalls ?? []), tc] })),
         agentStatus: 'tool_calling',
@@ -64,17 +68,24 @@ export function streamEventPatch(state: StreamState, event: SSEEventData): Strea
     }
 
     case 'tool_result': {
-      const tr: ToolResult = { toolCallId: event.data.tool_call_id, output: event.data.output, isError: event.data.is_error }
+      const tr: ToolResult = {
+        toolCallId: event.data.tool_call_id,
+        output: event.data.output,
+        isError: event.data.is_error,
+      }
       return {
         messages: changeLast(state.messages, (m) => ({ ...m, toolResults: [...(m.toolResults ?? []), tr] })),
       }
     }
 
     case 'usage': {
-      const usage: TokenUsage = { inputTokens: event.data.input_tokens, outputTokens: event.data.output_tokens }
+      const usage: TokenUsage = {
+        inputTokens: event.data.input_tokens,
+        outputTokens: event.data.output_tokens,
+      }
       return {
         tokenUsage: usage,
-        sessions: state.sessions.map((s) => s.id === state.activeId ? { ...s, tokenUsage: usage } : s),
+        sessions: state.sessions.map((s) => (s.id === state.activeId ? { ...s, tokenUsage: usage } : s)),
       }
     }
 

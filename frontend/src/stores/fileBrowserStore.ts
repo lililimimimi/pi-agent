@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { fetchFileTree, fetchFileContent, type FileNode } from '@/services/api'
+import { fetchFileTree, fetchFileContent } from '@/services/api/files'
+import type { FileNode } from '@/services/api/files'
 
 export type SidebarView = 'sessions' | 'files'
 

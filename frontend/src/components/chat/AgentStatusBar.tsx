@@ -6,12 +6,15 @@ import { Brain, Wrench, ShieldAlert, Circle, Square } from 'lucide-react'
 
 const IDLE_TIMEOUT_MS = 30_000
 
-const statusConfig: Record<AgentStatus, {
-  label: string
-  icon: React.ComponentType<{ className?: string }>
-  color: string
-  animate?: boolean
-}> = {
+const statusConfig: Record<
+  AgentStatus,
+  {
+    label: string
+    icon: React.ComponentType<{ className?: string }>
+    color: string
+    animate?: boolean
+  }
+> = {
   idle: {
     label: 'Idle',
     icon: Circle,
@@ -43,10 +46,15 @@ export function AgentStatusBar() {
   const stopAgent = useChatStore((s) => s.stopAgent)
   const [displayStatus, setDisplayStatus] = useState<AgentStatus>(agentStatus)
 
+  // Show each new status as soon as it arrives
+  const [synced, setSynced] = useState({ agentStatus, lastEventAt })
+  if (synced.agentStatus !== agentStatus || synced.lastEventAt !== lastEventAt) {
+    setSynced({ agentStatus, lastEventAt })
+    setDisplayStatus(agentStatus)
+  }
+
   // Auto-idle after 30s of no events
   useEffect(() => {
-    setDisplayStatus(agentStatus)
-
     if (agentStatus === 'idle') return
 
     const timer = setTimeout(() => {

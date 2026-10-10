@@ -1,11 +1,9 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useChatStore, type PermissionRequest } from '@/stores/chatStore'
-import { ShieldAlert, Check, X, Clock } from 'lucide-react'
-
-const AUTO_REJECT_SECONDS = 30
+import { ShieldAlert, Check, X } from 'lucide-react'
 
 const DANGEROUS_TOOLS = new Set(['bash', 'write', 'execute'])
 
@@ -15,30 +13,14 @@ type ApprovalModalProps = {
 
 export function ApprovalModal({ request }: ApprovalModalProps) {
   const respondPermission = useChatStore((s) => s.respondPermission)
-  const [countdown, setCountdown] = useState(AUTO_REJECT_SECONDS)
 
+  // Stays open until the user answers; nothing is rejected on its own
   const handleRespond = useCallback(
     (approved: boolean) => {
       respondPermission(request.toolCallId, approved)
     },
     [respondPermission, request.toolCallId],
   )
-
-  // Auto-reject countdown
-  useEffect(() => {
-    setCountdown(AUTO_REJECT_SECONDS)
-    const interval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          handleRespond(false)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [request.toolCallId, handleRespond])
 
   const isDangerous = DANGEROUS_TOOLS.has(request.toolName)
 
@@ -66,37 +48,27 @@ export function ApprovalModal({ request }: ApprovalModalProps) {
           {/* Risk hint */}
           {isDangerous && (
             <div className="bg-destructive/8 text-destructive text-sm rounded-xl px-4 py-3 border border-destructive/15">
-              ⚠️ This tool can modify files or execute commands on your system. Please review carefully before approving.
+              ⚠️ This tool can modify files or execute commands on your system. Please review carefully before
+              approving.
             </div>
           )}
 
           {/* Arguments */}
           <div>
-            <span className="text-sm text-muted-foreground uppercase tracking-wider font-medium">Arguments</span>
+            <span className="text-sm text-muted-foreground uppercase tracking-wider font-medium">
+              Arguments
+            </span>
             <pre className="mt-1.5 text-sm bg-foreground/[0.03] border border-border/30 p-3 rounded-xl overflow-x-auto max-h-48 text-foreground/70">
               {JSON.stringify(request.arguments, null, 2)}
             </pre>
           </div>
 
-          {/* Countdown */}
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            <span>Auto-reject in {countdown}s</span>
-          </div>
-
           {/* Actions */}
           <div className="flex gap-3 pt-1">
-            <Button
-              onClick={() => handleRespond(true)}
-              className="flex-1 rounded-xl h-10"
-            >
+            <Button onClick={() => handleRespond(true)} className="flex-1 rounded-xl h-10">
               <Check className="h-4 w-4 mr-1.5" /> Approve
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleRespond(false)}
-              className="flex-1 rounded-xl h-10"
-            >
+            <Button variant="outline" onClick={() => handleRespond(false)} className="flex-1 rounded-xl h-10">
               <X className="h-4 w-4 mr-1.5" /> Reject
             </Button>
           </div>

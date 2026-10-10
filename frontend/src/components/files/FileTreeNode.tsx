@@ -1,6 +1,6 @@
 import { ChevronRight, File as FileIcon, Folder, FolderOpen } from 'lucide-react'
 import { useFileBrowserStore } from '@/stores/fileBrowserStore'
-import type { FileNode } from '@/services/api'
+import type { FileNode } from '@/services/api/files'
 
 type FileTreeNodeProps = {
   node: FileNode

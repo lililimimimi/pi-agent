@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/services/api', () => ({
+vi.mock('@/services/api/chat', () => ({
   createChat: vi.fn(),
   streamChat: vi.fn(),
   approveToolCall: vi.fn(),
+}))
+vi.mock('@/services/api/models', () => ({
   fetchDefaultModel: vi.fn(),
+}))
+vi.mock('@/services/api/sessions', () => ({
   fetchSessions: vi.fn(async () => []),
   fetchSession: vi.fn(async () => []),
   deleteSessionApi: vi.fn(),
   bulkDeleteSessionsApi: vi.fn(),
+}))
+vi.mock('@/services/api/projects', () => ({
   fetchProjects: vi.fn(async () => []),
   createProjectApi: vi.fn(),
   deleteProjectApi: vi.fn(async () => {}),
@@ -27,8 +33,24 @@ beforeEach(() => {
     ],
     activeProjectId: 'proj-general',
     sessions: [
-      { id: 'ses-general', title: 'New', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: null },
-      { id: 'ses-rules', title: 'hello', projectId: 'proj-rules', messages: [{ id: 'm1', role: 'user', content: 'hello' }], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: 'persist-rules' },
+      {
+        id: 'ses-general',
+        title: 'New',
+        projectId: 'proj-general',
+        messages: [],
+        tokenUsage: { inputTokens: 0, outputTokens: 0 },
+        backendSessionId: null,
+        persistId: null,
+      },
+      {
+        id: 'ses-rules',
+        title: 'hello',
+        projectId: 'proj-rules',
+        messages: [{ id: 'm1', role: 'user', content: 'hello' }],
+        tokenUsage: { inputTokens: 0, outputTokens: 0 },
+        backendSessionId: null,
+        persistId: 'persist-rules',
+      },
     ],
     activeId: 'ses-general',
     messages: [],
@@ -37,7 +59,10 @@ beforeEach(() => {
 
 describe('restoreLastView', () => {
   it('returns to the saved project and conversation after a reload', async () => {
-    localStorage.setItem('pi.lastView', JSON.stringify({ projectPath: RULES_PATH, persistId: 'persist-rules' }))
+    localStorage.setItem(
+      'pi.lastView',
+      JSON.stringify({ projectPath: RULES_PATH, persistId: 'persist-rules' }),
+    )
 
     await useChatStore.getState().restoreLastView()
 
@@ -66,7 +91,10 @@ describe('restoreLastView', () => {
     // Fresh module instance: the restore flag starts unset, as on a real page load
     vi.resetModules()
     const { useChatStore: fresh } = await import('../chatStore')
-    localStorage.setItem('pi.lastView', JSON.stringify({ projectPath: RULES_PATH, persistId: 'persist-rules' }))
+    localStorage.setItem(
+      'pi.lastView',
+      JSON.stringify({ projectPath: RULES_PATH, persistId: 'persist-rules' }),
+    )
 
     fresh.setState({ activeProjectId: 'proj-general' })
 
@@ -79,7 +107,7 @@ describe('restoreLastView', () => {
 
 describe('restoreLastView with a single session in the project', () => {
   it('loads the messages even when the session is already selected', async () => {
-    const { fetchSession } = await import('@/services/api')
+    const { fetchSession } = await import('@/services/api/sessions')
     vi.mocked(fetchSession).mockResolvedValueOnce([
       { type: 'message', role: 'user', content: 'hello' },
       { type: 'message', role: 'assistant', content: 'Hi there' },
@@ -87,11 +115,30 @@ describe('restoreLastView with a single session in the project', () => {
 
     useChatStore.setState({
       sessions: [
-        { id: 'ses-general', title: 'New', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: null },
-        { id: 'ses-rules', title: 'hello', projectId: 'proj-rules', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: 'persist-rules' },
+        {
+          id: 'ses-general',
+          title: 'New',
+          projectId: 'proj-general',
+          messages: [],
+          tokenUsage: { inputTokens: 0, outputTokens: 0 },
+          backendSessionId: null,
+          persistId: null,
+        },
+        {
+          id: 'ses-rules',
+          title: 'hello',
+          projectId: 'proj-rules',
+          messages: [],
+          tokenUsage: { inputTokens: 0, outputTokens: 0 },
+          backendSessionId: null,
+          persistId: 'persist-rules',
+        },
       ],
     })
-    localStorage.setItem('pi.lastView', JSON.stringify({ projectPath: RULES_PATH, persistId: 'persist-rules' }))
+    localStorage.setItem(
+      'pi.lastView',
+      JSON.stringify({ projectPath: RULES_PATH, persistId: 'persist-rules' }),
+    )
 
     await useChatStore.getState().restoreLastView()
 
@@ -102,27 +149,33 @@ describe('restoreLastView with a single session in the project', () => {
 
 describe('deleteProject', () => {
   it('removes sessions and keeps the folder by default', async () => {
-    const api = await import('@/services/api')
+    const api = await import('@/services/api/projects')
     vi.mocked(api.deleteProjectApi).mockClear()
 
     useChatStore.getState().deleteProject('proj-rules')
 
-    expect(api.deleteProjectApi).toHaveBeenCalledWith('proj-rules', { deleteSessions: true, deleteFolder: false })
+    expect(api.deleteProjectApi).toHaveBeenCalledWith('proj-rules', {
+      deleteSessions: true,
+      deleteFolder: false,
+    })
   })
 
   it('also deletes the folder when the user chose that', async () => {
-    const api = await import('@/services/api')
+    const api = await import('@/services/api/projects')
     vi.mocked(api.deleteProjectApi).mockClear()
 
     useChatStore.getState().deleteProject('proj-rules', true)
 
-    expect(api.deleteProjectApi).toHaveBeenCalledWith('proj-rules', { deleteSessions: true, deleteFolder: true })
+    expect(api.deleteProjectApi).toHaveBeenCalledWith('proj-rules', {
+      deleteSessions: true,
+      deleteFolder: true,
+    })
   })
 })
 
 describe('opening a session with a saved failed turn', () => {
   it('shows the failed turn as an error message, not as a reply', async () => {
-    const { fetchSession } = await import('@/services/api')
+    const { fetchSession } = await import('@/services/api/sessions')
     vi.mocked(fetchSession).mockResolvedValueOnce([
       { type: 'message', role: 'user', content: 'hello' },
       { type: 'message', role: 'assistant', content: 'Error: out of extra usage' },
@@ -130,8 +183,24 @@ describe('opening a session with a saved failed turn', () => {
 
     useChatStore.setState({
       sessions: [
-        { id: 'ses-general', title: 'New', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: null },
-        { id: 'ses-chat', title: 'hello', projectId: 'proj-general', messages: [], tokenUsage: { inputTokens: 0, outputTokens: 0 }, backendSessionId: null, persistId: 'persist-chat' },
+        {
+          id: 'ses-general',
+          title: 'New',
+          projectId: 'proj-general',
+          messages: [],
+          tokenUsage: { inputTokens: 0, outputTokens: 0 },
+          backendSessionId: null,
+          persistId: null,
+        },
+        {
+          id: 'ses-chat',
+          title: 'hello',
+          projectId: 'proj-general',
+          messages: [],
+          tokenUsage: { inputTokens: 0, outputTokens: 0 },
+          backendSessionId: null,
+          persistId: 'persist-chat',
+        },
       ],
     })
     await useChatStore.getState().switchSession('ses-chat')

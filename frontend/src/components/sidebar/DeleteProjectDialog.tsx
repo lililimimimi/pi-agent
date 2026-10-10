@@ -11,10 +11,16 @@ type DeleteProjectDialogProps = {
 
 // Confirms removing a project. Keeps the choice short: remove from the app, or also move the folder to Trash.
 export function DeleteProjectDialog({
-  projectName, folderPath, sessionCount, onCancel, onConfirm,
+  projectName,
+  folderPath,
+  sessionCount,
+  onCancel,
+  onConfirm,
 }: DeleteProjectDialogProps) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel()
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onCancel])

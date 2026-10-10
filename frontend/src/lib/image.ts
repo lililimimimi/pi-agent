@@ -31,8 +31,14 @@ function loadImageElement(blob: Blob): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(blob)
   return new Promise((resolve, reject) => {
     const img = new Image()
-    img.onload = () => { URL.revokeObjectURL(url); resolve(img) }
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Cannot decode image')) }
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(img)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Cannot decode image'))
+    }
     img.src = url
   })
 }
@@ -110,7 +116,9 @@ export function imageFilesFromItems(items: ArrayLike<DataTransferItem>): File[] 
  * Image files from a paste or drop. Browsers differ: some expose a screenshot
  * only through `items`, others only through `files`, so both are checked.
  */
-export function imageFilesFromTransfer(data: { items?: ArrayLike<DataTransferItem> | null; files?: ArrayLike<File> | null } | null): File[] {
+export function imageFilesFromTransfer(
+  data: { items?: ArrayLike<DataTransferItem> | null; files?: ArrayLike<File> | null } | null,
+): File[] {
   if (!data) return []
   const fromItems = data.items ? imageFilesFromItems(data.items) : []
   if (fromItems.length > 0) return fromItems

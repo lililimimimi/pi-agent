@@ -67,6 +67,118 @@ export const TestResultSchema = z
   })
   .passthrough()
 
+export const SessionSummarySchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    project_id: z.string(),
+    created_at: z.string(),
+  })
+  .passthrough()
+
+export const ProjectSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    path: z.string(),
+    created_at: z.string(),
+  })
+  .passthrough()
+
+export const BrowseResultSchema = z
+  .object({
+    current: z.string(),
+    parent: z.string().nullable(),
+    dirs: z.array(z.object({ name: z.string(), path: z.string() }).passthrough()),
+  })
+  .passthrough()
+
+export type FileNode = {
+  name: string
+  type: 'dir' | 'file'
+  path: string // relative to the project root; '' for the root itself
+  size?: number
+  children?: FileNode[] | null // null = directory not expanded by the server
+}
+
+export const FileNodeSchema: z.ZodType<FileNode> = z.lazy(() =>
+  z
+    .object({
+      name: z.string(),
+      type: z.enum(['dir', 'file']),
+      path: z.string(),
+      size: z.number().optional(),
+      children: z.array(FileNodeSchema).nullable().optional(),
+    })
+    .passthrough(),
+)
+
+export const SessionListSchema = z.array(SessionSummarySchema)
+export const ProjectListSchema = z.array(ProjectSchema)
+
+export type SessionSummary = z.infer<typeof SessionSummarySchema>
+export type ProjectData = z.infer<typeof ProjectSchema>
+export type BrowseResult = z.infer<typeof BrowseResultSchema>
+export type FileContent = z.infer<typeof FileContentSchema>
+
+export const FileContentSchema = z
+  .object({ path: z.string(), content: z.string(), size: z.number() })
+  .passthrough()
+
+export const CreateChatResponseSchema = z
+  .object({ session_id: z.string(), persist_id: z.string() })
+  .passthrough()
+
+/** Records of one saved session: the meta line, then messages (each has a `type`) */
+export const SessionRecordsSchema = z.array(z.object({ type: z.string() }).passthrough())
+
+// One event of the chat stream. Unknown events are an error: the backend and the page ship together.
+export const SSEEventSchema = z.discriminatedUnion('event', [
+  z.object({ event: z.literal('text'), data: z.object({ content: z.string() }).passthrough() }),
+  z.object({
+    event: z.literal('tool_call'),
+    data: z
+      .object({
+        tool_call_id: z.string(),
+        tool_name: z.string(),
+        arguments: z.record(z.unknown()),
+      })
+      .passthrough(),
+  }),
+  z.object({
+    event: z.literal('tool_result'),
+    data: z.object({ tool_call_id: z.string(), output: z.string(), is_error: z.boolean() }).passthrough(),
+  }),
+  z.object({
+    event: z.literal('usage'),
+    data: z.object({ input_tokens: z.number(), output_tokens: z.number() }).passthrough(),
+  }),
+  z.object({ event: z.literal('done'), data: z.object({}).passthrough() }),
+  z.object({
+    event: z.literal('permission_request'),
+    data: z
+      .object({
+        tool_call_id: z.string(),
+        tool_name: z.string(),
+        arguments: z.record(z.unknown()),
+      })
+      .passthrough(),
+  }),
+  z.object({ event: z.literal('error'), data: z.object({ message: z.string() }).passthrough() }),
+  z.object({
+    event: z.literal('execution_preview'),
+    data: z
+      .object({
+        preview_id: z.string(),
+        steps: z.array(z.string()),
+        has_write_ops: z.boolean(),
+      })
+      .passthrough(),
+  }),
+])
+
+export type SSEEvent = z.infer<typeof SSEEventSchema>
+
 /** Parses a response body; throws a readable error if the shape is not what the page expects. */
 export function parseResponse<T extends z.ZodTypeAny>(schema: T, data: unknown, source: string): z.infer<T> {
   const result = schema.safeParse(data)

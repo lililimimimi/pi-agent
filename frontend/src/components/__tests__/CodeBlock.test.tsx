@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MessageBubble } from '@/components/chat/MessageBubble'
 import type { Message } from '@/types'
 
@@ -40,9 +39,7 @@ describe('CodeBlock (via MessageBubble)', () => {
     fireEvent.click(screen.getByLabelText('Copy code'))
 
     await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith(
-        expect.stringContaining('console'),
-      )
+      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('console'))
     })
   })
 

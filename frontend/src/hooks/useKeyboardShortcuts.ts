@@ -37,7 +37,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
             handlers.onFocusInput()
           } else {
             const textarea = document.querySelector<HTMLTextAreaElement>(
-              'textarea[placeholder="Message pi…"]'
+              'textarea[placeholder="Message pi…"]',
             )
             textarea?.focus()
           }

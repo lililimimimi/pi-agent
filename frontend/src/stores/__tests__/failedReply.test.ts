@@ -15,12 +15,15 @@ function sseResponse(lines: string[]) {
 
 describe('a failed reply', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (String(url).endsWith('/api/chat')) {
-        return new Response(JSON.stringify({ session_id: 's1', persist_id: 'p1' }), { status: 200 })
-      }
-      return sseResponse(['data: {"event":"error","data":{"message":"model not supported"}}'])
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).endsWith('/api/chat')) {
+          return new Response(JSON.stringify({ session_id: 's1', persist_id: 'p1' }), { status: 200 })
+        }
+        return sseResponse(['data: {"event":"error","data":{"message":"model not supported"}}'])
+      }),
+    )
   })
   afterEach(() => vi.unstubAllGlobals())
 
